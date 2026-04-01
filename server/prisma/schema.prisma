@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum LogLevel {
+  INFO
+  WARN
+  ERROR
+  CRITICAL
+}
+
+enum UserRole {
+  ADMIN
+  SUPLIER
+  BUYER
+  SUPERADMIN
+}
+
+model User {
+  id       String   @id @default(uuid())
+  username String   @unique
+  email    String?  @unique
+  password String
+  role     UserRole
+  isActive Boolean  @default(true)
+
+
+  logs                 SystemLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([username, role])
+}
+
+model SystemLog {
+  id      String   @id @default(uuid())
+  level   LogLevel @default(INFO)
+  message String
+  context String? // e.g., "AuthService", "FinanceUpdate"
+  payload Json? // Stores snapshots of data (sanitized)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([level, createdAt])
+  @@index([userId])
+}
