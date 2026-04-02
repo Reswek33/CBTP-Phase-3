@@ -37,7 +37,6 @@ export const authController = {
           password: true,
           role: true,
           isActive: true,
-          employee: { select: { id: true } },
         },
       });
 
