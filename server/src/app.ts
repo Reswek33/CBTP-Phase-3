@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createServer } from "node:http";
 import express from "express";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
@@ -6,9 +7,10 @@ import { Request, Response } from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 
-import authRoutes from "./router/auth.router";
+import authRoutes from "./modules/auth/auth.route";
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 5000;
 const API_VERSION = process.env.API_VERSION || "v1";
 const API_PREFIX = `/api/${API_VERSION}`;
@@ -66,7 +68,7 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(
     `Server running in ${isProduction ? "PRODUCTION" : "DEVELOPMENT"} mode`,
   );
