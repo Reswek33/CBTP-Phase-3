@@ -1,15 +1,45 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// --- Enums ---
+
+enum Role {
+  ADMIN
+  SUPERADMIN
+  SUPPLIER
+  BUYER
+}
+
+enum SupplierStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum RfpPriority {
+  NORMAL
+  URGENT
+}
+
+enum RfpStatus {
+  OPEN
+  CLOSED
+  AWARDED
+  CANCELLED
+}
+
+enum BidStatus {
+  ACTIVE
+  WINNING
+  OUTBID
+  WITHDRAWN
+  AWARDED
 }
 
 enum LogLevel {
@@ -19,42 +49,182 @@ enum LogLevel {
   CRITICAL
 }
 
-enum UserRole {
-  ADMIN
-  SUPLIER
-  BUYER
-  SUPERADMIN
-}
+// --- Models ---
 
 model User {
-  id       String   @id @default(uuid())
-  username String   @unique
-  email    String?  @unique
-  password String
-  role     UserRole
-  isActive Boolean  @default(true)
+  id           String   @id @default(uuid()) @db.Uuid
+  firstName    String
+  lastName     String
+  username     String   @unique
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(BUYER)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
+  // One-to-one profiles
+  supplier Supplier?
+  buyer    Buyer?
 
-  logs                 SystemLog[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Relations
+  activityLogs      ActivityLog[]
+  systemLogs        SystemLog[]
+  notifications     Notification[]
+  sentMessages      Message[]          @relation("Sender")
+  verifiedDocuments SupplierDocument[] @relation("Verifier")
 
   @@index([username, role])
+  @@map("users")
+}
+
+model Supplier {
+  id                 String         @id @db.Uuid
+  businessName       String         @map("business_name")
+  phone              String?
+  address            String?
+  taxId              String?        @unique @map("tax_id")
+  registrationNumber String?        @unique @map("registration_number")
+  yearsInBusiness    Int?           @map("years_in_business")
+  categories         String[]
+  bio                String?
+  status             SupplierStatus @default(PENDING)
+  verifiedAt         DateTime?      @map("verified_at")
+  rejectedReason     String?        @map("rejected_reason")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  user          User               @relation(fields: [id], references: [id], onDelete: Cascade)
+  documents     SupplierDocument[]
+  bids          Bid[]
+  conversations Conversation[]
+
+  @@map("suppliers")
+}
+
+model Buyer {
+  id          String   @id @db.Uuid
+  companyName String   @map("company_name")
+  phone       String?
+  address     String?
+  department  String?
+  position    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user          User           @relation(fields: [id], references: [id], onDelete: Cascade)
+  rfps          Rfp[]
+  conversations Conversation[]
+
+  @@map("buyers")
+}
+
+model Rfp {
+  id          String      @id @default(uuid()) @db.Uuid
+  buyerId     String      @map("buyer_id") @db.Uuid
+  title       String
+  description String?
+  category    String
+  budget      Decimal?    @db.Decimal(15, 2)
+  deadline    DateTime    @db.Date
+  priority    RfpPriority @default(NORMAL)
+  status      RfpStatus   @default(OPEN)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  buyer         Buyer          @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  bids          Bid[]
+  conversations Conversation[]
+
+  @@index([buyerId])
+  @@index([status])
+  @@map("rfps")
+}
+
+model Bid {
+  id         String    @id @default(uuid()) @db.Uuid
+  rfpId      String    @map("rfp_id") @db.Uuid
+  supplierId String    @map("supplier_id") @db.Uuid
+  amount     Decimal   @db.Decimal(15, 2)
+  proposal   String?
+  status     BidStatus @default(ACTIVE)
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  rfp      Rfp      @relation(fields: [rfpId], references: [id])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("bids")
+}
+
+model SupplierDocument {
+  id           String    @id @default(uuid()) @db.Uuid
+  supplierId   String    @map("supplier_id") @db.Uuid
+  documentType String    @map("document_type")
+  fileName     String    @map("file_name")
+  filePath     String    @map("file_path")
+  uploadedAt   DateTime  @default(now()) @map("uploaded_at")
+  verifiedBy   String?   @map("verified_by") @db.Uuid
+  verifiedAt   DateTime? @map("verified_at")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  verifier User?    @relation("Verifier", fields: [verifiedBy], references: [id])
+
+  @@index([supplierId])
+  @@map("supplier_documents")
 }
 
 model SystemLog {
-  id      String   @id @default(uuid())
+  id      String   @id @default(uuid()) @db.Uuid
   level   LogLevel @default(INFO)
   message String
-  context String? // e.g., "AuthService", "FinanceUpdate"
-  payload Json? // Stores snapshots of data (sanitized)
-
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id])
+  context String?
+  payload Json?
+  userId  String?  @db.Uuid
+  user    User?    @relation(fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
 
   @@index([level, createdAt])
-  @@index([userId])
+  @@map("system_logs")
+}
+
+// Minimal placeholder models for the remaining relations
+model ActivityLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  action    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  content   String
+  isRead    Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Conversation {
+  id         String    @id @default(uuid()) @db.Uuid
+  rfpId      String?   @db.Uuid
+  buyerId    String    @db.Uuid
+  supplierId String    @db.Uuid
+  rfp        Rfp?      @relation(fields: [rfpId], references: [id])
+  buyer      Buyer     @relation(fields: [buyerId], references: [id])
+  supplier   Supplier  @relation(fields: [supplierId], references: [id])
+  messages   Message[]
+}
+
+model Message {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @db.Uuid
+  senderId       String       @db.Uuid
+  content        String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         User         @relation("Sender", fields: [senderId], references: [id])
 }
