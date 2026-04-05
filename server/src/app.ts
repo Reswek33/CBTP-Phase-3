@@ -8,6 +8,7 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 
 import authRoutes from "./modules/auth/auth.route";
+import rfpsRoutes from "./modules/rfps/rfps.route";
 
 const app = express();
 const server = createServer(app);
@@ -51,6 +52,7 @@ app.use(cookieParser());
 
 // Routes
 app.use(`${API_PREFIX}/auth`, authRoutes);
+app.use(`${API_PREFIX}/rfps`, rfpsRoutes);
 
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({
