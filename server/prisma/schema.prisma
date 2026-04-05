@@ -42,6 +42,12 @@ enum BidStatus {
   AWARDED
 }
 
+enum Currency {
+  USD
+  EUR
+  ETB
+}
+
 enum LogLevel {
   INFO
   WARN
@@ -128,14 +134,19 @@ model Rfp {
   description String?
   category    String
   budget      Decimal?    @db.Decimal(15, 2)
+  currency    Currency    @default(ETB)
   deadline    DateTime    @db.Date
   priority    RfpPriority @default(NORMAL)
   status      RfpStatus   @default(OPEN)
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  awardedBidId String? @map("awarded_bid_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   buyer         Buyer          @relation(fields: [buyerId], references: [id], onDelete: Cascade)
   bids          Bid[]
+  documents     RfpDocument[]
   conversations Conversation[]
 
   @@index([buyerId])
@@ -144,13 +155,14 @@ model Rfp {
 }
 
 model Bid {
-  id         String    @id @default(uuid()) @db.Uuid
-  rfpId      String    @map("rfp_id") @db.Uuid
-  supplierId String    @map("supplier_id") @db.Uuid
-  amount     Decimal   @db.Decimal(15, 2)
-  proposal   String?
-  status     BidStatus @default(ACTIVE)
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id              String    @id @default(uuid()) @db.Uuid
+  rfpId           String    @map("rfp_id") @db.Uuid
+  supplierId      String    @map("supplier_id") @db.Uuid
+  amount          Decimal   @db.Decimal(15, 2)
+  proposal        String?
+  status          BidStatus @default(ACTIVE)
+  rejectionReason String?   @map("rejection_reason")
+  createdAt       DateTime  @default(now()) @map("created_at")
 
   rfp      Rfp      @relation(fields: [rfpId], references: [id])
   supplier Supplier @relation(fields: [supplierId], references: [id])
@@ -173,6 +185,17 @@ model SupplierDocument {
 
   @@index([supplierId])
   @@map("supplier_documents")
+}
+
+model RfpDocument {
+  id        String   @id @default(uuid()) @db.Uuid
+  rfpId     String   @map("rfp_id") @db.Uuid
+  fileName  String   @map("file_name")
+  filePath  String   @map("file_path")
+  rfp       Rfp      @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("rfp_documents")
 }
 
 model SystemLog {
