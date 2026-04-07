@@ -65,7 +65,7 @@ export const bidController = {
         data: result,
       });
     } catch (error) {
-      console.log("[BID_CONTROLLER_CREATE_BID]");
+      console.log("[BID_CONTROLLER_CREATE_BID]", error);
       handleError("POST /bid", error, res);
     }
   },
