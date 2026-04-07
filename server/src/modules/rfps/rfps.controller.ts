@@ -102,7 +102,18 @@ export const rfpsController = {
       const userId = req.user?.id;
       const rfp = await prisma.rfp.findUnique({
         where: { id: id },
-        include: { buyer: true, _count: { select: { bids: true } } },
+        include: {
+          documents: {
+            select: {
+              id: true,
+              fileName: true,
+              filePath: true,
+            },
+          },
+
+          buyer: true,
+          _count: { select: { bids: true } },
+        },
       });
 
       if (!rfp) {
