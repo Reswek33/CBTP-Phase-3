@@ -15,14 +15,22 @@ export const adminController = {
   verifySupplier: async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params as { id: string };
     const { status, reason } = req.body; // status: 'VERIFIED' | 'REJECTED'
+    const adminId = req.user?.id;
 
-    const updatedSupplier = await prisma.supplier.update({
-      where: { id },
-      data: {
-        status,
-        rejectedReason: status === "REJECTED" ? reason : null,
-        verifiedAt: status === "VERIFIED" ? new Date() : null,
-      },
+    const updatedSupplier = await prisma.$transaction(async (tx) => {
+      const supplier = await tx.supplier.update({
+        where: { id: id },
+        data: {
+          status: status,
+          rejectedReason: reason,
+        },
+      });
+
+      await tx.supplierDocument.updateMany({
+        where: { supplierId: id, verifiedAt: null },
+        data: { verifiedBy: adminId, verifiedAt: new Date() },
+      });
+      return supplier;
     });
 
     await logActivity(
