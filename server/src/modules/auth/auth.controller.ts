@@ -247,8 +247,29 @@ export const authController = {
           lastName: true,
           role: true,
           isActive: true,
-          createdAt: true,
-          updatedAt: true,
+          supplier: {
+            select: {
+              status: true,
+              phone: true,
+              address: true,
+              taxId: true,
+              registrationNumber: true,
+              yearsInBusiness: true,
+              categories: true,
+              bio: true,
+              rejectedReason: true,
+              documents: true,
+            },
+          },
+          buyer: {
+            select: {
+              companyName: true,
+              phone: true,
+              address: true,
+              department: true,
+              position: true,
+            },
+          },
         },
       });
 
@@ -256,6 +277,12 @@ export const authController = {
         return res
           .status(404)
           .json({ success: false, message: "User not found" });
+
+      // const formattedUser = {
+      //   ...user,
+      //   status: user.supplier?.status || null,
+      //   supplier: undefined, // Optional: remove the nested object to keep it clean
+      // };
 
       return res.status(200).json({ success: true, user: user });
     } catch (err) {
