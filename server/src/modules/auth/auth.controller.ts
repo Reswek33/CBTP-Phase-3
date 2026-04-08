@@ -233,32 +233,29 @@ export const authController = {
    */
   me: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      if (!req.user)
-        return res
-          .status(401)
-          .json({ success: false, message: "Unauthorized" });
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized",
+        });
+      }
 
       const user = await prisma.user.findUnique({
         where: { id: req.user.id, isActive: true },
-        select: {
-          id: true,
-          username: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          isActive: true,
+        include: {
           supplier: {
-            select: {
-              status: true,
-              phone: true,
-              address: true,
-              taxId: true,
-              registrationNumber: true,
-              yearsInBusiness: true,
-              categories: true,
-              bio: true,
-              rejectedReason: true,
-              documents: true,
+            include: {
+              documents: {
+                select: {
+                  id: true,
+                  fileName: true,
+                  filePath: true,
+                  documentType: true,
+                  uploadedAt: true,
+                  verifiedAt: true,
+                  verifiedBy: true,
+                },
+              },
             },
           },
           buyer: {
@@ -268,24 +265,55 @@ export const authController = {
               address: true,
               department: true,
               position: true,
+              createdAt: true,
             },
           },
         },
       });
 
-      if (!user)
-        return res
-          .status(404)
-          .json({ success: false, message: "User not found" });
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
 
-      // const formattedUser = {
-      //   ...user,
-      //   status: user.supplier?.status || null,
-      //   supplier: undefined, // Optional: remove the nested object to keep it clean
-      // };
+      // Check for inconsistent state
+      if (user.role === "SUPPLIER" && !user.supplier) {
+        console.error(
+          `[INCONSISTENT STATE] User ${user.id} has SUPPLIER role but no supplier profile`,
+        );
+        await prisma.systemLog.create({
+          data: {
+            level: "ERROR",
+            message: "Inconsistent user state",
+            context: "User has SUPPLIER role but missing supplier record",
+            userId: user.id,
+            payload: { userId: user.id, role: user.role },
+          },
+        });
+      }
 
-      return res.status(200).json({ success: true, user: user });
+      const responseUser = {
+        id: user.id,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        supplier: user.role === "SUPPLIER" ? user.supplier : null,
+        buyer: user.role === "BUYER" ? user.buyer : null,
+      };
+
+      return res.status(200).json({
+        success: true,
+        user: responseUser,
+      });
     } catch (err) {
+      console.error("[AUTH_ME_ERROR]", err);
       handleError("GET /auth/me", err, res);
     }
   },
@@ -398,3 +426,34 @@ export const authController = {
     }
   },
 };
+
+// {
+//   "success": true,
+//   "user": {
+//     "id": "c62d1c3a-1989-4642-a4c9-87c6c0473e51",
+//     "username": "bob_logistics",
+//     "firstName": "Bob",
+//     "lastName": "Supplier",
+//     "role": "SUPPLIER",
+//     "isActive": true,
+//     "supplier": {
+//       "id": "c62d1c3a-1989-4642-a4c9-87c6c0473e51",
+//       "businessName": "Global Logistics Ltd",
+//       "phone": "0910004718",
+//       "address": "Addis Ababa, Bole",
+//       "taxId": "1234567890",
+//       "registrationNumber": "0987654321",
+//       "yearsInBusiness": 8,
+//       "categories": [
+//         "General"
+//       ],
+//       "bio": "We provide",
+//       "status": "PENDING",
+//       "verifiedAt": null,
+//       "rejectedReason": null,
+//       "createdAt": "2026-04-05T18:28:45.692Z",
+//       "updatedAt": "2026-04-07T19:05:41.648Z"
+//     },
+//     "buyer": null
+//   }
+// }
