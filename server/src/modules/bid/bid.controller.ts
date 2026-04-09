@@ -5,6 +5,7 @@ import { prisma } from "../../config/prisma";
 import { Prisma } from "@prisma/client/extension";
 import { logActivity } from "../../shared/utils/logger";
 import { getIO } from "../../config/socket";
+import { sendNotification } from "../../shared/utils/notification";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -57,6 +58,7 @@ export const bidController = {
         "INFO",
         userId,
         "bids.create",
+        { amount, rfpId },
       );
 
       return res.status(201).json({
@@ -65,10 +67,17 @@ export const bidController = {
         data: result,
       });
     } catch (error) {
+      await logActivity(
+        `Failed to create bid on RFP ${req.params.rfpId}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "ERROR",
+        req.user?.id,
+        "bids.create",
+      );
       console.log("[BID_CONTROLLER_CREATE_BID]", error);
       handleError("POST /bid", error, res);
     }
   },
+
   getBids: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.user?.id;
@@ -76,7 +85,7 @@ export const bidController = {
 
       let whereClause = {};
 
-      if (role === "SUPLLIER") {
+      if (role === "SUPPLIER") {
         whereClause = { supplierId: userId };
       } else if (role === "BUYER") {
         whereClause = { rfp: { buyerId: userId } };
@@ -90,6 +99,13 @@ export const bidController = {
         orderBy: { createdAt: "desc" },
       });
 
+      await logActivity(
+        `Viewed bids list as ${role}`,
+        "INFO",
+        userId,
+        "bids.getMany",
+      );
+
       return res.status(200).json({
         success: true,
         message: role === "ADMIN" ? "All system bids" : "Your relevant bids",
@@ -97,24 +113,28 @@ export const bidController = {
         data: bids,
       });
     } catch (error) {
+      await logActivity(
+        `Failed to fetch bids list: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "ERROR",
+        req.user?.id,
+        "bids.getMany",
+      );
       console.log("[BID_CONTROLLER_GET_BIDS]");
-      handleError("POST /bid", error, res);
+      handleError("GET /bids", error, res);
     }
   },
+
   awardBid: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { bidId } = req.params;
-      const userId = req.user?.id;
+      const userId = req.user?.id as string;
       const io = getIO();
 
       const result = await prisma.$transaction(
         async (tx: TransactionClient) => {
           const bid = await tx.bid.findUnique({
             where: { id: bidId },
-            includes: {
-              rfp: true,
-              supplier: true,
-            },
+            include: { rfp: true, supplier: true },
           });
 
           if (!bid) throw new Error("BID_NOT_FOUND");
@@ -122,7 +142,7 @@ export const bidController = {
             throw new Error("NOT_AUTHORIZED_BUYER");
           if (bid.rfp.status !== "OPEN") throw new Error("RFP_NOT_OPEN");
 
-          const updatedRfp = await tx.rfp.update({
+          await tx.rfp.update({
             where: { id: bid.rfpId },
             data: { status: "AWARDED" },
           });
@@ -132,46 +152,61 @@ export const bidController = {
             data: { status: "AWARDED" },
           });
 
-          await tx.bid.updateMany({
-            where: {
-              rfpId: bid.rfpId,
-              id: { not: bidId },
-            },
-            data: { status: "CLOSED" },
-          });
-          io.to(bid.rfpId).emit("rfp_awarded", {
-            winnerId: bid.supplierId,
-            rfpTitle: bid.rfp.title,
+          const otherBidders = await tx.bid.findMany({
+            where: { rfpId: bid.rfpId, id: { not: bidId } },
+            select: { supplierId: true },
           });
 
-          return { winningBid, updatedRfp };
+          await tx.bid.updateMany({
+            where: { rfpId: bid.rfpId, id: { not: bidId } },
+            data: { status: "CLOSED" },
+          });
+
+          // --- NOTIFICATION & SOCKET LOGIC ---
+
+          // 1. Notify the Winner
+          await sendNotification({
+            userId: bid.supplierId,
+            type: "BID_AWARDED",
+            content: `Congratulations! You have been awarded the contract for "${bid.rfp.title}".`,
+            room: bid.supplierId,
+            link: `/dashboard/bids/${bidId}`,
+          });
+
+          // 2. Notify Losers
+          const uniqueLoserIds = [
+            ...new Set(
+              otherBidders.map((b: { supplierId: string }) => b.supplierId),
+            ),
+          ];
+          await Promise.all(
+            uniqueLoserIds.map((sId: any) =>
+              sendNotification({
+                userId: sId,
+                type: "RFP_CLOSED",
+                content: `The RFP "${bid.rfp.title}" has been awarded to another supplier.`,
+                room: sId,
+              }),
+            ),
+          );
+
+          // 3. Update all users currently viewing this RFP room
+          io.to(bid.rfpId).emit("rfp_status_changed", {
+            status: "AWARDED",
+            winnerName: bid.supplier.businessName,
+          });
+
+          return { winningBid, supplierName: bid.supplier.businessName };
         },
       );
 
-      await logActivity(
-        `RFP ${result.updatedRfp.title} awarded to ${result.winningBid.supplierId}`,
-        "INFO",
-        userId,
-        "bids.award",
-        { rfpId: result.updatedRfp.id, winnerId: result.winningBid.id },
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: "RFP successfully awarded and closed.",
-        data: result,
-      });
+      await logActivity(`RFP Awarded`, "INFO", userId, "bids.award", { bidId });
+      return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
-      console.log("[BID_CONTROLLER_AWARD_BID]");
-      if (error.message === "NOT_AUTHORIZED_BUYER") {
-        return res.status(403).json({
-          success: false,
-          message: "You are not the owner of this RFP.",
-        });
-      }
-      handleError("POST /bid", error, res);
+      handleError("POST /bid/award", error, res);
     }
   },
+
   getBidById: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params as { id: string };
@@ -181,7 +216,7 @@ export const bidController = {
       const bid = await prisma.bid.findUnique({
         where: { id },
         include: {
-          rfp: true, // Need this to check who the Buyer is
+          rfp: true,
           supplier: {
             select: { businessName: true, status: true },
           },
@@ -189,30 +224,242 @@ export const bidController = {
       });
 
       if (!bid) {
+        await logActivity(
+          `Bid ${id} not found`,
+          "WARN",
+          userId,
+          "bids.getOne",
+          { bidId: id },
+        );
         return res
           .status(404)
           .json({ success: false, message: "Bid not found" });
       }
 
-      // SECURITY CHECK:
-      // Is this the Supplier who made the bid? OR is this the Buyer who owns the RFP?
       const isOwner = bid.supplierId === userId;
       const isBuyer = bid.rfp.buyerId === userId;
       const isAdmin = role === "ADMIN" || role === "SUPERADMIN";
 
       if (!isOwner && !isBuyer && !isAdmin) {
+        await logActivity(
+          `Unauthorized attempt to view bid ${id}`,
+          "WARN",
+          userId,
+          "bids.getOne",
+          {
+            bidId: id,
+            bidOwnerId: bid.supplierId,
+            rfpBuyerId: bid.rfp.buyerId,
+          },
+        );
         return res.status(403).json({
           success: false,
           message: "You are not authorized to view this bid.",
         });
       }
 
+      await logActivity(
+        `Viewed bid details ${id}`,
+        "INFO",
+        userId,
+        "bids.getOne",
+      );
+
       return res.status(200).json({
         success: true,
         data: bid,
       });
     } catch (error) {
+      await logActivity(
+        `Failed to fetch bid ${req.params.id}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "ERROR",
+        req.user?.id,
+        "bids.getOne",
+      );
       handleError("GET /bid/:id", error, res);
+    }
+  },
+
+  submitFinancialBid: async (req: AuthenticatedRequest, res: Response) => {
+    const { bidId } = req.params as { bidId: string };
+    const { amount } = req.body;
+    const userId = req.user?.id;
+
+    try {
+      const existingBid = await prisma.bid.findUnique({ where: { id: bidId } });
+
+      if (existingBid?.status !== "ACTIVE") {
+        await logActivity(
+          `Attempted to submit financial bid on non-active bid ${bidId} (status: ${existingBid?.status})`,
+          "WARN",
+          userId,
+          "bids.submitFinancial",
+          { bidId, currentStatus: existingBid?.status },
+        );
+        return res.status(403).json({
+          message: "You must be approved by the buyer before entering a price.",
+        });
+      }
+
+      const updatedBid = await prisma.bid.update({
+        where: { id: bidId },
+        data: { amount },
+      });
+
+      await logActivity(
+        `Financial bid amount updated for bid ${bidId}`,
+        "INFO",
+        userId,
+        "bids.submitFinancial",
+        { amount },
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: `Bid ${bidId} submitted successfully`,
+        data: updatedBid,
+      });
+    } catch (error) {
+      await logActivity(
+        `Failed to submit financial bid for ${bidId}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "ERROR",
+        userId,
+        "bids.submitFinancial",
+      );
+      console.error("BID_CONTROLLER_SUBMIT_FINANCIAL_BID", error);
+      handleError("POST /bids/:bidId/submit-amount", error, res);
+    }
+  },
+
+  applyToBid: async (req: AuthenticatedRequest, res: Response) => {
+    const { rfpId } = req.params as { rfpId: string };
+    const { proposal } = req.body;
+    const supplierId = req.user?.id as string;
+    const io = getIO();
+
+    try {
+      const bid = await prisma.bid.create({
+        data: {
+          rfpId,
+          supplierId,
+          proposal,
+          status: "PENDING_APPROVAL",
+        },
+        include: { rfp: { select: { buyerId: true, title: true } } },
+      });
+
+      // --- NOTIFICATION & SOCKET LOGIC ---
+
+      // Notify the Buyer
+      await sendNotification({
+        userId: bid.rfp.buyerId,
+        type: "NEW_BID_APPLICATION",
+        content: `A new supplier has applied to your RFP: ${bid.rfp.title}`,
+        room: bid.rfp.buyerId,
+        link: `/dashboard/rfps/${rfpId}`,
+      });
+
+      // Real-time update for buyer's dashboard if they are on the RFP page
+      io.to(rfpId).emit("new_application_received", { bidId: bid.id });
+
+      return res.status(201).json({ success: true, data: bid });
+    } catch (error) {
+      handleError("POST /bids/apply/:rfpId", error, res);
+    }
+  },
+
+  updateApplicationStatus: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { bidId } = req.params as { bidId: string };
+      const { status, rejectionReason } = req.body;
+      const io = getIO();
+
+      const bid = await prisma.bid.update({
+        where: { id: bidId },
+        data: { status, rejectionReason },
+        include: { rfp: { select: { title: true } } },
+      });
+
+      // --- NOTIFICATION & SOCKET LOGIC ---
+
+      await sendNotification({
+        userId: bid.supplierId,
+        type: status === "ACTIVE" ? "BID_APPROVED" : "BID_REJECTED",
+        content:
+          status === "ACTIVE"
+            ? `Your application for "${bid.rfp.title}" was approved! You can now submit your financial bid.`
+            : `Your application for "${bid.rfp.title}" was rejected. Reason: ${rejectionReason}`,
+        room: bid.supplierId,
+      });
+
+      // Tell the supplier UI to unlock the financial input
+      io.to(bid.supplierId).emit("bid_status_updated", { bidId, status });
+
+      return res.status(200).json({ success: true, data: bid });
+    } catch (error) {
+      handleError("PATCH /bids/:bidId/status", error, res);
+    }
+  },
+
+  withdrawBid: async (req: AuthenticatedRequest, res: Response) => {
+    const { bidId } = req.params as { bidId: string };
+    const userId = req.user?.id;
+
+    try {
+      const existingBid = await prisma.bid.findUnique({
+        where: { id: bidId, supplierId: userId },
+      });
+
+      if (!existingBid) {
+        await logActivity(
+          `Withdraw failed: Bid ${bidId} not found or not owned by user`,
+          "WARN",
+          userId,
+          "bids.withdraw",
+          { bidId },
+        );
+        return res.status(404).json({ message: "Bid not found" });
+      }
+
+      if (
+        existingBid.status !== "ACTIVE" &&
+        existingBid.status !== "PENDING_APPROVAL"
+      ) {
+        await logActivity(
+          `Cannot withdraw bid ${bidId} with status ${existingBid.status}`,
+          "WARN",
+          userId,
+          "bids.withdraw",
+          { bidId, currentStatus: existingBid.status },
+        );
+        return res.status(403).json({
+          message: `Cannot withdraw bid with status: ${existingBid.status}`,
+        });
+      }
+
+      await prisma.bid.update({
+        where: { id: bidId, supplierId: userId },
+        data: { status: "WITHDRAWN" },
+      });
+
+      await logActivity(
+        `Bid ${bidId} withdrawn`,
+        "INFO",
+        userId,
+        "bids.withdraw",
+        { bidId },
+      );
+
+      res.json({ success: true, message: "Bid withdrawn successfully" });
+    } catch (err) {
+      await logActivity(
+        `Failed to withdraw bid ${bidId}: ${err instanceof Error ? err.message : "Unknown error"}`,
+        "ERROR",
+        userId,
+        "bids.withdraw",
+      );
+      console.error("BID_CONTROLLER_WITHDRAW_BID", err);
+      handleError("PATCH /bids/:bidId/withdraw", err, res);
     }
   },
 };
