@@ -11,6 +11,8 @@ import { logActivity } from "../../shared/utils/logger";
 import { prisma } from "../../config/prisma";
 import { Prisma } from "@prisma/client/extension";
 import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
+import { getIO } from "../../config/socket";
+import { sendNotification } from "../../shared/utils/notification";
 
 const saltRound = Number(process.env.SALT_ROUNDS) || 10;
 type TransactionClient = Prisma.TransactionClient;
@@ -108,10 +110,17 @@ export const authController = {
         },
       });
     } catch (err) {
+      await logActivity(
+        `Registration failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+        "ERROR",
+        undefined,
+        "AuthService.register",
+      );
       console.error(err);
       handleError("POST /auth/register", err, res);
     }
   },
+
   /**
    * Identifies user by email or username, verifies password,
    * and issues HTTP-only JWT cookies.
@@ -195,6 +204,12 @@ export const authController = {
         isActive: user.isActive,
       });
     } catch (err) {
+      await logActivity(
+        `Login failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+        "ERROR",
+        undefined,
+        "AuthService.login",
+      );
       console.error(err);
       handleError("POST /auth/login", err, res);
     }
@@ -223,6 +238,12 @@ export const authController = {
         );
       }
     } catch (err) {
+      await logActivity(
+        `Logout failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+        "ERROR",
+        undefined,
+        "AuthService.logout",
+      );
       handleError("DELETE /auth/logout", err, res);
     }
   },
@@ -272,6 +293,12 @@ export const authController = {
       });
 
       if (!user) {
+        await logActivity(
+          `User profile not found for ID: ${req.user.id}`,
+          "WARN",
+          req.user.id,
+          "AuthService.me",
+        );
         return res.status(404).json({
           success: false,
           message: "User not found",
@@ -282,6 +309,13 @@ export const authController = {
       if (user.role === "SUPPLIER" && !user.supplier) {
         console.error(
           `[INCONSISTENT STATE] User ${user.id} has SUPPLIER role but no supplier profile`,
+        );
+        await logActivity(
+          `Inconsistent state: SUPPLIER role without supplier profile`,
+          "ERROR",
+          user.id,
+          "AuthService.me",
+          { userId: user.id, role: user.role },
         );
         await prisma.systemLog.create({
           data: {
@@ -313,6 +347,12 @@ export const authController = {
         user: responseUser,
       });
     } catch (err) {
+      await logActivity(
+        `Failed to fetch user profile: ${err instanceof Error ? err.message : "Unknown error"}`,
+        "ERROR",
+        req.user?.id,
+        "AuthService.me",
+      );
       console.error("[AUTH_ME_ERROR]", err);
       handleError("GET /auth/me", err, res);
     }
@@ -324,11 +364,24 @@ export const authController = {
   refreshTokenHandler: async (req: Request, res: Response) => {
     try {
       const { refreshToken } = req.cookies;
-      if (!refreshToken)
+      if (!refreshToken) {
+        await logActivity(
+          "Refresh token attempt: No token provided",
+          "WARN",
+          undefined,
+          "AuthService.refreshToken",
+        );
         return res.status(401).json({ message: "No refresh token provided" });
+      }
 
       const decoded = verifyRefreshToken(refreshToken);
       if (!decoded || typeof decoded === "string") {
+        await logActivity(
+          "Refresh token attempt: Invalid or expired token",
+          "WARN",
+          undefined,
+          "AuthService.refreshToken",
+        );
         return res
           .status(401)
           .json({ message: "Invalid or expired refresh token" });
@@ -340,10 +393,17 @@ export const authController = {
         select: { id: true, role: true },
       });
 
-      if (!user)
+      if (!user) {
+        await logActivity(
+          `Refresh token failed: User ${id} not found or inactive`,
+          "WARN",
+          id,
+          "AuthService.refreshToken",
+        );
         return res
           .status(403)
           .json({ message: "User is inactive or not found" });
+      }
 
       const newTokens = generateTokens(user.id, user.role);
       setAuthCookies(res, {
@@ -351,8 +411,21 @@ export const authController = {
         refreshToken: newTokens.refreshToken,
       });
 
+      await logActivity(
+        "Tokens refreshed successfully",
+        "INFO",
+        user.id,
+        "AuthService.refreshToken",
+      );
+
       return res.json({ message: "Token refreshed successfully" });
     } catch (err) {
+      await logActivity(
+        `Refresh token failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+        "ERROR",
+        undefined,
+        "AuthService.refreshToken",
+      );
       handleError("POST /auth/refresh", err, res);
     }
   },
@@ -364,20 +437,30 @@ export const authController = {
   updateCredentials: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { username, tempPassword, newPassword } = req.body;
-      if (!req.user)
+      const io = getIO();
+
+      if (!req.user) {
         return res
           .status(401)
           .json({ success: false, message: "Unauthorized" });
+      }
 
       const user = await prisma.user.findUnique({
         where: { id: req.user.id },
         select: { passwordHash: true },
       });
 
-      if (!user)
+      if (!user) {
+        await logActivity(
+          `Update credentials failed: User ${req.user.id} not found`,
+          "ERROR",
+          req.user.id,
+          "AuthService.updateCredentials",
+        );
         return res
           .status(404)
           .json({ success: false, message: "User not found" });
+      }
 
       // Verify current password before allowing change
       if (
@@ -395,10 +478,11 @@ export const authController = {
           .json({ success: false, message: "Invalid credential" });
       }
 
-      const updateData: { username?: string; password?: string } = {};
+      const updateData: { username?: string; passwordHash?: string } = {};
       if (username) updateData.username = username;
-      if (newPassword)
-        updateData.password = await bcrypt.hash(newPassword, saltRound);
+      if (newPassword) {
+        updateData.passwordHash = await bcrypt.hash(newPassword, saltRound);
+      }
 
       if (Object.keys(updateData).length === 0) {
         return res
@@ -411,49 +495,39 @@ export const authController = {
         data: updateData,
       });
 
+      const fieldUpdated = newPassword ? "password" : "username";
+
+      await sendNotification({
+        userId: req.user.id,
+        type: "SECURITY_UPDATE",
+        content: `Your ${fieldUpdated} was successfully updated. If this wasn't you, contact support immediately.`,
+        room: req.user.id,
+      });
+
+      // Emit a security event (can be used on frontend to show a specific alert)
+      io.to(req.user.id).emit("security_alert", {
+        message: `${fieldUpdated} changed successfully`,
+      });
+
       await logActivity(
-        "Credentials updated (username/password)",
+        `Credentials updated: ${username ? "username" : ""} ${newPassword ? "password" : ""}`,
         "INFO",
         req.user.id,
         "AuthService.updateCredentials",
+        { updatedFields: Object.keys(updateData) },
       );
 
       res
         .status(200)
         .json({ success: true, message: "Credentials updated successfully" });
     } catch (error) {
+      await logActivity(
+        `Update credentials failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "ERROR",
+        req.user?.id,
+        "AuthService.updateCredentials",
+      );
       handleError("PATCH /auth/update", error, res);
     }
   },
 };
-
-// {
-//   "success": true,
-//   "user": {
-//     "id": "c62d1c3a-1989-4642-a4c9-87c6c0473e51",
-//     "username": "bob_logistics",
-//     "firstName": "Bob",
-//     "lastName": "Supplier",
-//     "role": "SUPPLIER",
-//     "isActive": true,
-//     "supplier": {
-//       "id": "c62d1c3a-1989-4642-a4c9-87c6c0473e51",
-//       "businessName": "Global Logistics Ltd",
-//       "phone": "0910004718",
-//       "address": "Addis Ababa, Bole",
-//       "taxId": "1234567890",
-//       "registrationNumber": "0987654321",
-//       "yearsInBusiness": 8,
-//       "categories": [
-//         "General"
-//       ],
-//       "bio": "We provide",
-//       "status": "PENDING",
-//       "verifiedAt": null,
-//       "rejectedReason": null,
-//       "createdAt": "2026-04-05T18:28:45.692Z",
-//       "updatedAt": "2026-04-07T19:05:41.648Z"
-//     },
-//     "buyer": null
-//   }
-// }
