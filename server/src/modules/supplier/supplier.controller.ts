@@ -4,7 +4,8 @@ import { prisma } from "../../config/prisma";
 import handleError from "../../shared/utils/error";
 import { logActivity } from "../../shared/utils/logger";
 import { sendNotification } from "../../shared/utils/notification"; // Added
-import { getIO } from "../../config/socket"; // Added
+import { getIO } from "../../config/socket";
+import { deleteFileIfExists } from "../../shared/utils/fileCleanup";
 
 export const supplierController = {
   uploadDocument: async (req: AuthenticatedRequest, res: Response) => {
@@ -142,6 +143,8 @@ export const supplierController = {
           .json({ message: "Cannot delete verified documents" });
       }
 
+      await deleteFileIfExists(doc.filePath);
+
       await prisma.supplierDocument.delete({ where: { id: docId } });
 
       // --- NOTIFICATION ---
@@ -162,6 +165,40 @@ export const supplierController = {
       res.status(200).json({ success: true, message: "Document removed" });
     } catch (err) {
       handleError("DELETE /supplier/documents/:id", err, res);
+    }
+  },
+  getMyBids: async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.id;
+    try {
+      const bids = await prisma.bid.findMany({
+        where: {
+          supplierId: userId,
+        },
+
+        include: {
+          rfp: {
+            select: {
+              id: true,
+              title: true,
+              category: true,
+              budget: true,
+              currency: true,
+              deadline: true,
+              status: true,
+              buyer: { select: { companyName: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return res.status(200).json({
+        success: true,
+        message: `${userId} bids`,
+        data: bids,
+      });
+    } catch (error) {
+      console.error("[SUPPLIER_CONTROLLER_GET_MY_BIDS");
+      handleError("GET /supplier/bids", error, res);
     }
   },
 };
