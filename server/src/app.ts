@@ -10,7 +10,10 @@ import rateLimit from "express-rate-limit";
 import authRoutes from "./modules/auth/auth.route";
 import rfpsRoutes from "./modules/rfps/rfps.route";
 import bidRoutes from "./modules/bid/bid.route";
-import supplierRouter from "./modules/supplier/supplier.route";
+import supplierRoutes from "./modules/supplier/supplier.route";
+import adminRoutes from "./modules/admin/admin.route";
+import buyerRoutes from "./modules/buyer/buyer.route";
+import chatRouter from "./modules/chat/chat.route";
 
 import { initSocket } from "./config/socket";
 import path, { dirname } from "node:path";
@@ -65,7 +68,10 @@ app.use(cookieParser());
 app.use(`${API_PREFIX}/auth`, authRoutes);
 app.use(`${API_PREFIX}/rfps`, rfpsRoutes);
 app.use(`${API_PREFIX}/bids`, bidRoutes);
-app.use(`${API_PREFIX}/supplier`, supplierRouter);
+app.use(`${API_PREFIX}/supplier`, supplierRoutes);
+app.use(`${API_PREFIX}/admin`, adminRoutes);
+app.use(`${API_PREFIX}/buyer`, buyerRoutes);
+app.use(`${API_PREFIX}/chat`, chatRouter);
 
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({
