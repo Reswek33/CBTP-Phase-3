@@ -158,8 +158,11 @@ export const bidController = {
           });
 
           await tx.bid.updateMany({
-            where: { rfpId: bid.rfpId, id: { not: bidId } },
-            data: { status: "CLOSED" },
+            where: {
+              rfpId: bid.rfpId,
+              id: { not: bidId },
+            },
+            data: { status: "OUTBID" },
           });
 
           // --- NOTIFICATION & SOCKET LOGIC ---
@@ -203,6 +206,7 @@ export const bidController = {
       await logActivity(`RFP Awarded`, "INFO", userId, "bids.award", { bidId });
       return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
+      console.error("[BID_CONTROLLER_AWARD_BID]", error);
       handleError("POST /bid/award", error, res);
     }
   },
@@ -276,6 +280,7 @@ export const bidController = {
         req.user?.id,
         "bids.getOne",
       );
+      console.error("[BID_CONTROLLER_GET_BID_BY_ID]", error);
       handleError("GET /bid/:id", error, res);
     }
   },
@@ -364,6 +369,7 @@ export const bidController = {
 
       return res.status(201).json({ success: true, data: bid });
     } catch (error) {
+      console.error("[BIDS_CONTROLLER_APPLY_TO_BID", error);
       handleError("POST /bids/apply/:rfpId", error, res);
     }
   },
@@ -397,6 +403,7 @@ export const bidController = {
 
       return res.status(200).json({ success: true, data: bid });
     } catch (error) {
+      console.error("[BID_CONTROLLER_UPDATE_APPLICATION_STATSU]", error);
       handleError("PATCH /bids/:bidId/status", error, res);
     }
   },
