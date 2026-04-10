@@ -14,6 +14,8 @@ router
     upload.single("business_doc"), // The field name the frontend must use
     supplierController.uploadDocument,
   )
-  .patch("/profile", supplierController.updateProfile);
+  .patch("/profile", supplierController.updateProfile)
+  .get("/bids", supplierController.getMyBids)
+  .delete("/documents/:docId", supplierController.deleteDocument);
 
 export default router;
