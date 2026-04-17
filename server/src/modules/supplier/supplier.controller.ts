@@ -12,7 +12,6 @@ export const supplierController = {
     try {
       const userId = req.user?.id;
       const file = req.file;
-      const io = getIO();
 
       if (!file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -20,41 +19,57 @@ export const supplierController = {
 
       const { documentType } = req.body;
 
-      const document = await prisma.supplierDocument.create({
-        data: {
-          supplierId: userId!,
-          documentType: documentType || "BUSINESS_LICENSE",
-          fileName: file.originalname,
-          filePath: file.path,
-        },
-      });
+      const [document] = await prisma.$transaction([
+        prisma.supplierDocument.create({
+          data: {
+            supplierId: userId!,
+            documentType: documentType || "BUSINESS_LICENSE",
+            fileName: file.originalname,
+            filePath: file.path,
+          },
+        }),
+        prisma.supplier.update({
+          where: { id: userId },
+          data: { status: "PENDING" },
+        }),
+      ]);
 
-      // Reset status to PENDING so Admin knows there is new data to review
-      await prisma.supplier.update({
+      const admins = await prisma.user.findMany({
+        where: { role: { in: ["ADMIN", "SUPERADMIN"] } },
+        select: { id: true },
+      });
+      const user = await prisma.user.findUnique({
         where: { id: userId },
-        data: { status: "PENDING" },
+        select: { firstName: true, lastName: true },
       });
 
       // --- NOTIFICATION LOGIC ---
-      await sendNotification({
-        userId: userId!,
-        type: "DOCUMENT_UPLOADED",
-        content: `Document (${document.documentType}) uploaded successfully. Status: PENDING review.`,
-        room: userId, // Targeted to the specific user's socket room
-      });
+      await Promise.all([
+        sendNotification({
+          userId: userId!,
+          type: "DOCUMENT_UPLOADED",
+          content: `Your ${document.documentType} was uploaded. Status: PENDING review.`,
+          room: userId,
+        }),
 
-      // Notify Admins room if you have one (optional but recommended)
-      io.to("ADMIN_ROOM").emit("admin_alert", {
-        message: `New document upload from Supplier: ${userId}`,
-        type: "VERIFICATION_REQUEST",
-      });
+        ...admins.map((admin) => {
+          sendNotification({
+            userId: admin.id,
+            type: "VERIFICATION_REQUEST",
+            content: `New document upload from Supplier: ${user?.firstName} ${user?.lastName}`,
+            room: admin.id,
+          });
+        }),
 
-      await logActivity(
-        `Document uploaded: ${document.documentType}`,
-        "INFO",
-        userId,
-        "Supplier.uploadDocument",
-      );
+        logActivity(
+          `Document uploaded: ${document.documentType}`,
+          "INFO",
+          userId,
+          "Supplier.uploadDocument",
+          undefined,
+          true, // Record as user action
+        ),
+      ]);
 
       return res.status(201).json({
         success: true,
