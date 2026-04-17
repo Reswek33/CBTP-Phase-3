@@ -91,6 +91,11 @@ export const authController = {
         accessToken: tokens.accessToken,
       });
 
+      const admins = await prisma.user.findMany({
+        where: { role: { in: ["ADMIN", "SUPERADMIN"] } },
+        select: { id: true },
+      });
+
       // 6. Log Success
       await logActivity(
         `New ${newUser.role} registered: ${newUser.username}`,
@@ -98,6 +103,34 @@ export const authController = {
         newUser.id,
         "AuthService.register",
       );
+
+      await Promise.all([
+        // 1. Log Activity
+        logActivity(
+          `New ${newUser.role} registered: ${newUser.username}`,
+          "INFO",
+          newUser.id,
+          "AuthService.register",
+        ),
+
+        // 2. Welcome the New User (Saved to DB + Socket)
+        sendNotification({
+          userId: newUser.id,
+          type: "WELCOME",
+          content: `Welcome to KAF Portal, ${newUser.firstName}! Please complete your profile.`,
+          room: newUser.id, // Targeted room
+        }),
+
+        // 3. Notify all Admins (Saved to DB + Socket)
+        ...admins.map((admin) =>
+          sendNotification({
+            userId: admin.id,
+            type: "USER_REGISTRATION",
+            content: `New ${newUser.role} registered: ${newUser.firstName} ${newUser.lastName}`,
+            room: admin.id, // Or "ADMIN_ROOM" if your socket setup supports it
+          }),
+        ),
+      ]);
 
       return res.status(201).json({
         success: true,
