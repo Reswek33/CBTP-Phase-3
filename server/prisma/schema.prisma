@@ -245,6 +245,7 @@ model Conversation {
   buyer      Buyer     @relation(fields: [buyerId], references: [id])
   supplier   Supplier  @relation(fields: [supplierId], references: [id])
   messages   Message[]
+  createdAt  DateTime @default(now())
 
   @@unique([rfpId, buyerId, supplierId])
 }
