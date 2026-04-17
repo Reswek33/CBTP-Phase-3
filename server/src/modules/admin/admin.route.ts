@@ -14,7 +14,8 @@ router
   .get("/logs", adminController.getActivityLogs)
   .get("/suppliers/pending", adminController.getPendingSuppliers)
   .patch("/suppliers/:id/verify", adminController.verifySupplier)
-  .patch("/users/:id/status", adminController.toggleUserStatus);
+  .patch("/users/:id/status", adminController.toggleUserStatus)
+  .get("/audit", adminController.getAllConversationsForAdmin);
 
 router
   .use(authenticateUser, requireRole(["SUPERADMIN"]))
