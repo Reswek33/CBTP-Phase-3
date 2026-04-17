@@ -7,6 +7,7 @@ import { logActivity } from "../../shared/utils/logger";
 import handleError from "../../shared/utils/error";
 import { getIO } from "../../config/socket";
 import { sendNotification } from "../../shared/utils/notification";
+import { deleteFileIfExists } from "../../shared/utils/fileCleanup";
 
 export const rfpsController = {
   create: async (req: AuthenticatedRequest, res: Response) => {
@@ -23,6 +24,13 @@ export const rfpsController = {
       }
 
       const validatedData = rfpsCreateInputSchema.parse(req.body);
+
+      if (validatedData.deadline < new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "Deadline need to be in the future",
+        });
+      }
 
       const rfp = await prisma.rfp.create({
         data: {
@@ -111,6 +119,24 @@ export const rfpsController = {
       handleError("GET /rfps", error, res);
     }
   },
+  listMyRfps: async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.id;
+    try {
+      const rfps = await prisma.rfp.findMany({
+        where: { buyerId: userId },
+        include: { documents: true },
+      });
+      return res.status(200).json({
+        success: true,
+        message: `${userId} RFPS`,
+        data: rfps,
+        count: rfps.length,
+      });
+    } catch (err) {
+      console.error("[RFP_CONTROLLER_LIST_MY_RFPS]", err);
+      handleError("GET /rfps/my-rfps", err, res);
+    }
+  },
 
   listById: async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -175,13 +201,13 @@ export const rfpsController = {
   },
 
   cancelRfp: async (req: AuthenticatedRequest, res: Response) => {
-    const { id } = req.params as { id: string };
+    const { rfpId } = req.params as { rfpId: string };
     const userId = req.user?.id;
     const io = getIO();
 
     try {
       const rfp = await prisma.rfp.findUnique({
-        where: { id },
+        where: { id: rfpId },
         include: { bids: { select: { supplierId: true } } },
       });
 
@@ -190,7 +216,7 @@ export const rfpsController = {
       }
 
       await prisma.rfp.update({
-        where: { id },
+        where: { id: rfpId },
         data: { status: "CANCELLED" },
       });
 
@@ -210,12 +236,64 @@ export const rfpsController = {
       );
 
       // Emit to the specific RFP room for real-time UI updates
-      io.to(id).emit("rfp_cancelled", { rfpId: id });
+      io.to(rfp.id).emit("rfp_cancelled", { rfpId: rfp.id });
 
-      await logActivity(`RFP cancelled: ${id}`, "INFO", userId, "rfps.cancel");
+      await logActivity(
+        `RFP cancelled: ${rfpId}`,
+        "INFO",
+        userId,
+        "rfps.cancel",
+      );
       res.json({ success: true, message: "RFP Cancelled" });
     } catch (err) {
-      handleError("PATCH /rfps/:id/cancel", err, res);
+      handleError("PATCH /rfps/:rfpId/cancel", err, res);
+    }
+  },
+
+  delete: async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.id;
+    const { rfpId } = req.params as { rfpId: string };
+    try {
+      const rfp = await prisma.rfp.findUnique({
+        where: { id: rfpId },
+        select: {
+          buyerId: true,
+          documents: {
+            select: {
+              filePath: true,
+            },
+          },
+        },
+      });
+
+      if (!rfp) {
+        return res.status(404).json({
+          success: false,
+          message: "RFP not found",
+        });
+      }
+      if (rfp?.buyerId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: "Unauthorozid",
+        });
+      }
+
+      if (rfp.documents && rfp.documents.length > 0) {
+        await Promise.all(
+          rfp.documents.map((doc) => deleteFileIfExists(doc.filePath)),
+        );
+      }
+      await prisma.rfp.delete({
+        where: { id: rfpId },
+      });
+      return res.status(200).json({
+        success: true,
+        message: "RFP deleted successfully",
+      });
+    } catch (err) {
+      console.error("[RFP_CONTROLLER_DELETE]", err);
+      handleError("DELETE /rfps/:rfpid/delete", err, res);
     }
   },
 };
