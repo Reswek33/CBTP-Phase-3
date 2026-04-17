@@ -8,15 +8,21 @@ import { upload } from "../../config/multer";
 
 const router = Router();
 
-router.get("/", rfpsController.list).get("/:id", rfpsController.listById);
+router.get("/", rfpsController.list);
+
+router.get(
+  "/my-rfps",
+  authenticateUser,
+  requireRole(["BUYER"]),
+  rfpsController.listMyRfps,
+);
+
+router.get("/:id", rfpsController.listById);
 
 router
-  .use(authenticateUser)
-  .post(
-    "/",
-    requireRole(["BUYER"]),
-    upload.single("rfp_doc"),
-    rfpsController.create,
-  );
+  .use(authenticateUser, requireRole(["BUYER"]))
+  .post("/", upload.single("rfp_doc"), rfpsController.create)
+  .patch("/:rfpId", rfpsController.cancelRfp)
+  .delete("/:rfpId/delete", rfpsController.delete);
 
 export default router;
