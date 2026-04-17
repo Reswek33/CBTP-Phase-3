@@ -41,6 +41,7 @@ export const adminController = {
             rejectedReason: status === "REJECTED" ? rejectedReason : null,
             verifiedAt: status === "VERIFIED" ? new Date() : null,
           },
+          include: { user: true },
         });
 
         await tx.supplierDocument.updateMany({
@@ -62,13 +63,25 @@ export const adminController = {
       });
 
       // Emit specific event for UI state refresh
-      io.to(id).emit("supplier_status_updated", { status });
+      io.to(id).emit("profile_sync", {
+        status: updatedSupplier.status,
+        message: "Your account haas been updated",
+      });
+
+      if (status === "REJECTED") {
+        io.to(id).emit("profile_sync", {
+          status: updatedSupplier.status,
+          message: "Document is rejected. Please update the document.",
+        });
+      }
 
       await logActivity(
-        `Supplier ${id} set to ${status}`,
+        `Supplier verification ${status}: ${id}`,
         "INFO",
-        req.user?.id,
-        "Admin.verify",
+        adminId,
+        "AdminController.verifySupplier",
+        { status, rejectedReason },
+        true,
       );
 
       res.status(200).json({ success: true, data: updatedSupplier });
@@ -350,6 +363,30 @@ export const adminController = {
       );
       console.error("[ADMIN_DELETE_USER_PERMANENTLY]", err);
       handleError("DELETE /admin/users/:id", err, res);
+    }
+  },
+  getAllConversationsForAdmin: async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ) => {
+    // Ensure only admins reach here
+    if (req.user?.role !== "ADMIN" && req.user?.role !== "SUPERADMIN") {
+      return res.status(403).json({ message: "FORBIDDEN" });
+    }
+
+    try {
+      const conversations = await prisma.conversation.findMany({
+        include: {
+          buyer: { select: { companyName: true } },
+          supplier: { select: { businessName: true } },
+          rfp: { select: { title: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      res.status(200).json({ success: true, data: conversations });
+    } catch (error) {
+      handleError("ADMIN_GET_CHATS", error, res);
     }
   },
 };
