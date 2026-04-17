@@ -1,15 +1,18 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 
-// Ensure directories exist
+const isProduction = process.env.NODE_ENV === "production";
+
+// --- 1. LOCAL STORAGE CONFIGURATION ---
 const createDir = (dir: string) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 };
 
-const storage = multer.diskStorage({
+const localStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Dynamically choose folder based on field name
     const folder =
       file.fieldname === "rfp_doc" ? "uploads/rfps" : "uploads/documents";
     createDir(folder);
@@ -24,15 +27,37 @@ const storage = multer.diskStorage({
   },
 });
 
+// --- 2. CLOUDINARY STORAGE CONFIGURATION ---
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const cloudinaryStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => ({
+    folder:
+      file.fieldname === "rfp_doc" ? "kaf_portal/rfps" : "kaf_portal/documents",
+    resource_type: "auto",
+    public_id: `${file.fieldname}-${Date.now()}`,
+  }),
+});
+
+// --- 3. HYBRID LOGIC ---
+// If production, use Cloudinary. Otherwise, use Local Disk.
+const selectedStorage = isProduction ? cloudinaryStorage : localStorage;
+
 export const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB Limit
+  storage: selectedStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|pdf/;
-    const extname = allowedTypes.test(
-      path.extname(file.originalname).toLowerCase(),
-    );
-    if (extname) return cb(null, true);
-    cb(new Error("Only .png, .jpg and .pdf format allowed!"));
+    const isValid =
+      allowedTypes.test(file.mimetype) ||
+      allowedTypes.test(file.originalname.toLowerCase());
+
+    if (isValid) return cb(null, true);
+    cb(new Error("Only .png, .jpg and .pdf format allowed!") as any);
   },
 });
