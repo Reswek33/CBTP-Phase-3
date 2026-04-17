@@ -16,6 +16,6 @@ router
   )
   .patch("/profile", supplierController.updateProfile)
   .get("/bids", supplierController.getMyBids)
-  .delete("/documents/:docId", supplierController.deleteDocument);
+  .delete("/documents/:docId/delete", supplierController.deleteDocument);
 
 export default router;
