@@ -66,18 +66,41 @@ export const chatController = {
     const senderId = req.user?.id;
 
     try {
-      const message = await prisma.message.create({
-        data: { conversationId, senderId: senderId!, content },
-        include: { sender: { select: { firstName: true, lastName: true } } },
+      // 1. VERIFY PARTICIPATION: Ensure sender is part of this chat
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { buyerId: true, supplierId: true },
       });
 
-      // Emit via Socket.io to the specific conversation room
-      const io = getIO();
-      io.to(conversationId).emit("new_message", message);
+      if (
+        !conversation ||
+        (conversation.buyerId !== senderId &&
+          conversation.supplierId !== senderId)
+      ) {
+        return res
+          .status(403)
+          .json({ success: false, message: "CANNOT_SEND: NOT_A_PARTICIPANT" });
+      }
+
+      // 2. PERSIST
+      const message = await prisma.message.create({
+        data: { conversationId, senderId: senderId!, content },
+        include: {
+          sender: { select: { firstName: true, lastName: true, role: true } },
+        },
+      });
+
+      // 3. REAL-TIME EMIT
+      try {
+        const io = getIO();
+        io.to(conversationId).emit("new_message", message);
+      } catch (socketErr) {
+        console.warn("[SOCKET_EMIT_FAILED]", socketErr);
+        // We don't fail the request because the DB write succeeded
+      }
 
       res.status(201).json({ success: true, data: message });
     } catch (error) {
-      console.error("[CHAT_CONTROLLER_SEND_MESSAGE]", error);
       handleError("POST /chat/message", error, res);
     }
   },
@@ -133,42 +156,48 @@ export const chatController = {
   // Get message history for a specific conversation
   getMessages: async (req: AuthenticatedRequest, res: Response) => {
     const { conversationId } = req.params as { conversationId: string };
-    console.log("conversationId", conversationId);
     const userId = req.user?.id;
+    const userRole = req.user?.role;
 
     try {
-      // Security Check: Ensure the user belongs to this conversation
+      // 1. FETCH CONVERSATION WITH ROLES
       const conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
         select: { buyerId: true, supplierId: true },
       });
 
-      if (
-        !conversation ||
-        (conversation.buyerId !== userId && conversation.supplierId !== userId)
-      ) {
-        return res.status(403).json({
-          success: false,
-          message: "Unauthorized access to this conversation",
-        });
+      if (!conversation) {
+        return res
+          .status(404)
+          .json({ success: false, message: "CONVERSATION_NOT_FOUND" });
       }
 
+      // 2. MULTI-LEVEL ACCESS CHECK (Audit-Aware)
+      const isParticipant =
+        conversation.buyerId === userId || conversation.supplierId === userId;
+      const isAdmin = userRole === "ADMIN" || userRole === "SUPERADMIN";
+
+      if (!isParticipant && !isAdmin) {
+        return res
+          .status(403)
+          .json({ success: false, message: "UNAUTHORIZED_ACCESS" });
+      }
+
+      // 3. FETCH HISTORY
       const messages = await prisma.message.findMany({
         where: { conversationId },
         include: {
-          sender: {
-            select: { firstName: true, lastName: true, role: true },
-          },
+          sender: { select: { firstName: true, lastName: true, role: true } },
         },
-        orderBy: { createdAt: "asc" }, // Oldest first for chat flow
+        orderBy: { createdAt: "asc" },
       });
 
       return res.status(200).json({
         success: true,
         data: messages,
+        meta: { auditMode: isAdmin && !isParticipant }, // Helpful hint for frontend
       });
     } catch (error) {
-      console.error("[CHAT_CONTROLLER_GET_MESSAGES]", error);
       handleError("GET /chat/:conversationId/messages", error, res);
     }
   },
