@@ -17,6 +17,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/app.ts",
+    "start": "node ./dist/app.js",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "rebuild": "npm run clean && npm run build",
     "db:script": "tsx ./prisma/seed.ts",
     "db:format": "prisma format",
     "db:migrate": "prisma migrate dev",
