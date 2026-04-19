@@ -2,9 +2,9 @@ import { Router } from "express";
 import {
   authenticateUser,
   requireRole,
-} from "../../shared/middleware/authMiddleware";
-import { rfpsController } from "./rfps.controller";
-import { upload } from "../../config/multer";
+} from "../../shared/middleware/authMiddleware.js";
+import { rfpsController } from "./rfps.controller.js";
+import { upload } from "../../config/multer.js";
 
 const router = Router();
 

@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { upload } from "../../config/multer";
-import { supplierController } from "./supplier.controller";
+import { upload } from "../../config/multer.js";
+import { supplierController } from "./supplier.controller.js";
 import {
   authenticateUser,
   requireRole,
-} from "../../shared/middleware/authMiddleware";
+} from "../../shared/middleware/authMiddleware.js";
 
 const router = Router();
 router

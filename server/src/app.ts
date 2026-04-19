@@ -3,19 +3,19 @@ import { createServer } from "node:http";
 import express from "express";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 
-import authRoutes from "./modules/auth/auth.route";
-import rfpsRoutes from "./modules/rfps/rfps.route";
-import bidRoutes from "./modules/bid/bid.route";
-import supplierRoutes from "./modules/supplier/supplier.route";
-import adminRoutes from "./modules/admin/admin.route";
-import buyerRoutes from "./modules/buyer/buyer.route";
-import chatRouter from "./modules/chat/chat.route";
+import authRoutes from "./modules/auth/auth.route.js";
+import rfpsRoutes from "./modules/rfps/rfps.route.js";
+import bidRoutes from "./modules/bid/bid.route.js";
+import supplierRoutes from "./modules/supplier/supplier.route.js";
+import adminRoutes from "./modules/admin/admin.route.js";
+import buyerRoutes from "./modules/buyer/buyer.route.js";
+import chatRouter from "./modules/chat/chat.route.js";
 
-import { initSocket } from "./config/socket";
+import { initSocket } from "./config/socket.js";
 import path, { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,7 +30,7 @@ const __dirname = dirname(__filename);
 const isProduction =
   process.env.NODE_ENV === "production" ||
   process.env.NODE_ENV === "PRODUCTION";
-const vpsURL = process.env.VPS_URL;
+const vpsURL = process.env.CLIENT_URL;
 
 initSocket(server);
 

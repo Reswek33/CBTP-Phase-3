@@ -1,18 +1,18 @@
-import { Response } from "express";
-import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
-import handleError from "../../shared/utils/error";
-import { prisma } from "../../config/prisma";
+import type { Response } from "express";
+import type { AuthenticatedRequest } from "../../shared/middleware/authMiddleware.js";
+import handleError from "../../shared/utils/error.js";
+import { prisma } from "../../config/prisma.js";
 import { Prisma } from "@prisma/client/extension";
-import { logActivity } from "../../shared/utils/logger";
-import { getIO } from "../../config/socket";
-import { sendNotification } from "../../shared/utils/notification";
+import { logActivity } from "../../shared/utils/logger.js";
+import { getIO } from "../../config/socket.js";
+import { sendNotification } from "../../shared/utils/notification.js";
 
 type TransactionClient = Prisma.TransactionClient;
 
 export const bidController = {
   create: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { rfpId } = req.params;
+      const { rfpId } = req.params as { rfpId: string };
       const userId = req.user?.id;
       const { amount, proposal } = req.body;
       const io = getIO();
@@ -410,7 +410,7 @@ export const bidController = {
 
   withdrawBid: async (req: AuthenticatedRequest, res: Response) => {
     const { bidId } = req.params as { bidId: string };
-    const userId = req.user?.id;
+    const userId = req.user?.id!;
 
     try {
       const existingBid = await prisma.bid.findUnique({

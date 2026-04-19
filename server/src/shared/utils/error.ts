@@ -1,18 +1,20 @@
 import { ZodError } from "zod";
-import { Response } from "express";
-import { Prisma } from "../../../generated/prisma";
+import type { Response } from "express";
+import { Prisma } from "../../../generated/prisma/index.js";
 
 // Define error response interface for better type safety
 interface ErrorResponse {
   success: false;
   route: string;
   message: string;
-  code?: string;
+  code?: string | undefined;
   details?: unknown;
-  issues?: Array<{
-    path: string;
-    message: string;
-  }>;
+  issues?:
+    | Array<{
+        path: string;
+        message: string;
+      }>
+    | undefined;
 }
 
 const handleError = (route: string, error: unknown, res: Response) => {

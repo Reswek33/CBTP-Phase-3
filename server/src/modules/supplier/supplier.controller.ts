@@ -1,16 +1,16 @@
-import { Response } from "express";
-import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
-import { prisma } from "../../config/prisma";
-import handleError from "../../shared/utils/error";
-import { logActivity } from "../../shared/utils/logger";
-import { sendNotification } from "../../shared/utils/notification"; // Added
-import { getIO } from "../../config/socket";
-import { deleteFileIfExists } from "../../shared/utils/fileCleanup";
+import type { Response } from "express";
+import type { AuthenticatedRequest } from "../../shared/middleware/authMiddleware.js";
+import { prisma } from "../../config/prisma.js";
+import handleError from "../../shared/utils/error.js";
+import { logActivity } from "../../shared/utils/logger.js";
+import { sendNotification } from "../../shared/utils/notification.js";
+import { getIO } from "../../config/socket.js";
+import { deleteFileIfExists } from "../../shared/utils/fileCleanup.js";
 
 export const supplierController = {
   uploadDocument: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id!;
       const file = req.file;
 
       if (!file) {
@@ -83,9 +83,8 @@ export const supplierController = {
 
   updateProfile: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id!;
       const io = getIO();
-
       const {
         phone,
         address,
@@ -96,18 +95,20 @@ export const supplierController = {
         bio,
       } = req.body;
 
+      const toNull = <T>(value: T | undefined): T | null => {
+        return value !== undefined ? value : null;
+      };
+
       const updatedSupplier = await prisma.supplier.update({
         where: { id: userId },
         data: {
-          phone,
-          address,
-          taxId,
-          registrationNumber,
-          yearsInBusiness: yearsInBusiness
-            ? parseInt(yearsInBusiness)
-            : undefined,
-          categories,
-          bio,
+          phone: toNull(phone),
+          address: toNull(address),
+          taxId: toNull(taxId),
+          registrationNumber: toNull(registrationNumber),
+          yearsInBusiness: yearsInBusiness ? parseInt(yearsInBusiness) : null,
+          categories: toNull(categories),
+          bio: toNull(bio),
         },
       });
 
@@ -183,7 +184,7 @@ export const supplierController = {
     }
   },
   getMyBids: async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user?.id;
+    const userId = req.user?.id!;
     try {
       const bids = await prisma.bid.findMany({
         where: {

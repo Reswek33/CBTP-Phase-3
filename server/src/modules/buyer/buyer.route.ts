@@ -2,8 +2,8 @@ import { Router } from "express";
 import {
   authenticateUser,
   requireRole,
-} from "../../shared/middleware/authMiddleware";
-import { buyerController } from "./buyer.controller";
+} from "../../shared/middleware/authMiddleware.js";
+import { buyerController } from "./buyer.controller.js";
 
 const router = Router();
 

@@ -1,8 +1,8 @@
-import { Response } from "express";
-import { prisma } from "../../config/prisma";
-import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
-import { getIO } from "../../config/socket";
-import handleError from "../../shared/utils/error";
+import type { Response } from "express";
+import { prisma } from "../../config/prisma.js";
+import type { AuthenticatedRequest } from "../../shared/middleware/authMiddleware.js";
+import { getIO } from "../../config/socket.js";
+import handleError from "../../shared/utils/error.js";
 
 export const chatController = {
   // Start or get a conversation between a Buyer and Supplier
@@ -106,7 +106,7 @@ export const chatController = {
   },
   // Get all conversations for the logged-in user (Inbox View)
   getUserConversations: async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user?.id;
+    const userId = req.user?.id!;
 
     try {
       const conversations = await prisma.conversation.findMany({

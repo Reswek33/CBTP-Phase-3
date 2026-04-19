@@ -1,18 +1,18 @@
-import { Request, Response } from "express";
-import { registerInputSchema, userLoginInputSchema } from "./auth.schema";
+import type { Request, Response } from "express";
+import { registerInputSchema, userLoginInputSchema } from "./auth.schema.js";
 import bcrypt from "bcryptjs";
 import {
   generateTokens,
   setAuthCookies,
   verifyRefreshToken,
-} from "../../shared/utils/token";
-import handleError from "../../shared/utils/error";
-import { logActivity } from "../../shared/utils/logger";
-import { prisma } from "../../config/prisma";
+} from "../../shared/utils/token.js";
+import handleError from "../../shared/utils/error.js";
+import { logActivity } from "../../shared/utils/logger.js";
+import { prisma } from "../../config/prisma.js";
 import { Prisma } from "@prisma/client/extension";
-import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
-import { getIO } from "../../config/socket";
-import { sendNotification } from "../../shared/utils/notification";
+import type { AuthenticatedRequest } from "../../shared/middleware/authMiddleware.js";
+import { getIO } from "../../config/socket.js";
+import { sendNotification } from "../../shared/utils/notification.js";
 
 const saltRound = Number(process.env.SALT_ROUNDS) || 10;
 type TransactionClient = Prisma.TransactionClient;

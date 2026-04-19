@@ -1,10 +1,10 @@
-import { Response, Request } from "express";
-import { prisma } from "../../config/prisma";
-import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
-import { logActivity } from "../../shared/utils/logger";
-import handleError from "../../shared/utils/error";
-import { sendNotification } from "../../shared/utils/notification";
-import { getIO } from "../../config/socket";
+import type { Response } from "express";
+import type { AuthenticatedRequest } from "../../shared/middleware/authMiddleware.js";
+import { prisma } from "../../config/prisma.js";
+import { logActivity } from "../../shared/utils/logger.js";
+import handleError from "../../shared/utils/error.js";
+import { getIO } from "../../config/socket.js";
+import { sendNotification } from "../../shared/utils/notification.js";
 
 export const adminController = {
   getPendingSuppliers: async (req: AuthenticatedRequest, res: Response) => {
@@ -29,7 +29,7 @@ export const adminController = {
   verifySupplier: async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params as { id: string };
     const { status, rejectedReason } = req.body;
-    const adminId = req.user?.id;
+    const adminId = req.user?.id!;
     const io = getIO();
 
     try {
@@ -99,6 +99,7 @@ export const adminController = {
 
   getAllUsers: async (req: AuthenticatedRequest, res: Response) => {
     const requesterRole = req.user?.role;
+    const userId = req.user?.id!;
     try {
       let allowedRoles: string[] = ["BUYER", "SUPPLIER"];
       if (requesterRole === "SUPERADMIN") {
@@ -110,7 +111,7 @@ export const adminController = {
             in: allowedRoles as any,
           },
           NOT: {
-            id: req.user?.id,
+            id: userId,
           },
         },
         include: {

@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { bidController } from "./bid.controller";
+import { bidController } from "./bid.controller.js";
 import {
   authenticateUser,
   requireRole,
-} from "../../shared/middleware/authMiddleware";
-import { upload } from "../../config/multer";
+} from "../../shared/middleware/authMiddleware.js";
+import { upload } from "../../config/multer.js";
 
 const router = Router();
 

@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { Response } from "express";
+import type { Response } from "express";
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "access_secret";
 const REFRESH_TOKEN_SECRET =
@@ -21,11 +21,11 @@ interface TokenPayload {
 const generateTokens = (id: string, role: string) => {
   // Fix: Provide explicit type for options and ensure expiresIn is properly typed
   const accessTokenOptions: jwt.SignOptions = {
-    expiresIn: ACCESS_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+    expiresIn: ACCESS_EXPIRES_IN as number | jwt.SignOptions["expiresIn"],
   };
 
   const refreshTokenOptions: jwt.SignOptions = {
-    expiresIn: REFRESH_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+    expiresIn: REFRESH_EXPIRES_IN as number | jwt.SignOptions["expiresIn"],
   };
 
   const accessToken = jwt.sign(

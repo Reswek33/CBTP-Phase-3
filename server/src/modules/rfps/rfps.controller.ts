@@ -1,19 +1,19 @@
-import { Request, Response } from "express";
-import { Role } from "../../../generated/prisma";
-import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
-import { rfpsCreateInputSchema } from "./rfps.schema";
-import { prisma } from "../../config/prisma";
-import { logActivity } from "../../shared/utils/logger";
-import handleError from "../../shared/utils/error";
-import { getIO } from "../../config/socket";
-import { sendNotification } from "../../shared/utils/notification";
-import { deleteFileIfExists } from "../../shared/utils/fileCleanup";
+import type { Request, Response } from "express";
+import { Role } from "../../../generated/prisma/index.js";
+import type { AuthenticatedRequest } from "../../shared/middleware/authMiddleware.js";
+import { rfpsCreateInputSchema } from "./rfps.schema.js";
+import { prisma } from "../../config/prisma.js";
+import { logActivity } from "../../shared/utils/logger.js";
+import handleError from "../../shared/utils/error.js";
+import { getIO } from "../../config/socket.js";
+import { sendNotification } from "../../shared/utils/notification.js";
+import { deleteFileIfExists } from "../../shared/utils/fileCleanup.js";
 
 export const rfpsController = {
   create: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const role: Role = req.user?.role as Role;
-      const userId = req.user?.id;
+      const userId = req.user?.id!;
       const io = getIO(); // Initialize Socket
 
       const file = req.file;
@@ -32,19 +32,30 @@ export const rfpsController = {
         });
       }
 
+      const createData: any = {
+        title: validatedData.title,
+        category: validatedData.category,
+        budget: validatedData.budget,
+        deadline: validatedData.deadline,
+        priority: validatedData.priority,
+        status: "OPEN",
+        buyer: { connect: { id: userId } },
+      };
+
+      if (validatedData.description !== undefined) {
+        createData.description = validatedData.description;
+      } else {
+        createData.description = null;
+      }
+
+      if (file) {
+        createData.documents = {
+          create: [{ fileName: file.originalname, filePath: filePath || "" }],
+        };
+      }
+
       const rfp = await prisma.rfp.create({
-        data: {
-          ...validatedData,
-          status: "OPEN",
-          buyer: { connect: { id: userId } },
-          ...(file && {
-            documents: {
-              create: [
-                { fileName: file.originalname, filePath: filePath || "" },
-              ],
-            },
-          }),
-        },
+        data: createData,
       });
 
       // --- NEW: NOTIFICATION LOGIC ---
@@ -120,7 +131,7 @@ export const rfpsController = {
     }
   },
   listMyRfps: async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user?.id;
+    const userId = req.user?.id!;
     try {
       const rfps = await prisma.rfp.findMany({
         where: { buyerId: userId },

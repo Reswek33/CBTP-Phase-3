@@ -1,5 +1,5 @@
-import { LogLevel, User } from "../../../generated/prisma";
-import { prisma } from "../../config/prisma";
+import { LogLevel } from "../../../generated/prisma/index.js";
+import { prisma } from "../../config/prisma.js";
 
 /**
  * Optimized Logger
@@ -30,7 +30,7 @@ export const logActivity = async (
       });
     }
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.systemLog.create({
         data: {
           message,

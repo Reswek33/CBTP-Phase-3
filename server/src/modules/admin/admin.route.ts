@@ -2,8 +2,8 @@ import { Router } from "express";
 import {
   authenticateUser,
   requireRole,
-} from "../../shared/middleware/authMiddleware";
-import { adminController } from "./admin.controller";
+} from "../../shared/middleware/authMiddleware.js";
+import { adminController } from "./admin.controller.js";
 
 const router = Router();
 

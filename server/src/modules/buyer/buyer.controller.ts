@@ -1,14 +1,14 @@
-import { Response } from "express";
-import { prisma } from "../../config/prisma";
-import { AuthenticatedRequest } from "../../shared/middleware/authMiddleware";
-import handleError from "../../shared/utils/error";
-import { logActivity } from "../../shared/utils/logger";
-import { getIO } from "../../config/socket";
-import { sendNotification } from "../../shared/utils/notification";
+import type { Response } from "express";
+import { prisma } from "../../config/prisma.js";
+import type { AuthenticatedRequest } from "../../shared/middleware/authMiddleware.js";
+import handleError from "../../shared/utils/error.js";
+import { logActivity } from "../../shared/utils/logger.js";
+import { getIO } from "../../config/socket.js";
+import { sendNotification } from "../../shared/utils/notification.js";
 
 export const buyerController = {
   updateProfile: async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user?.id;
+    const userId = req.user?.id!;
     const { companyName, phone, address, department, position } = req.body;
     const io = getIO();
 
@@ -80,7 +80,7 @@ export const buyerController = {
   },
 
   deleteAccount: async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user?.id;
+    const userId = req.user?.id!;
     const io = getIO();
 
     try {
