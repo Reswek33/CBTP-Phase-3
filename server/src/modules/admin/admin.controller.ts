@@ -305,7 +305,7 @@ export const adminController = {
     const io = getIO();
 
     try {
-      const user = await prisma.user.update({
+      await prisma.user.update({
         where: { id },
         data: { isActive },
       });
