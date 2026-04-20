@@ -1,5 +1,5 @@
-import { prisma } from "../../config/prisma";
-import { getIO } from "../../config/socket";
+import { prisma } from "../../config/prisma.js";
+import { getIO } from "../../config/socket.js";
 
 export const sendNotification = async (data: {
   userId: string;
@@ -14,7 +14,7 @@ export const sendNotification = async (data: {
       data: {
         userId: data.userId,
         content: data.content,
-        link: data.link,
+        link: data.link ?? null,
         type: data.type,
       },
     });
