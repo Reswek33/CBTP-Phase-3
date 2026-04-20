@@ -14,6 +14,9 @@ import supplierRoutes from "./modules/supplier/supplier.route.js";
 import adminRoutes from "./modules/admin/admin.route.js";
 import buyerRoutes from "./modules/buyer/buyer.route.js";
 import chatRouter from "./modules/chat/chat.route.js";
+import notificationRoutes from "./modules/notification/notification.route.js";
+import statsRoute from "./modules/status/stats.route.js";
+import userRoutes from "./modules/user/user.route.js";
 
 import { initSocket } from "./config/socket.js";
 import path, { dirname } from "node:path";
@@ -72,6 +75,9 @@ app.use(`${API_PREFIX}/supplier`, supplierRoutes);
 app.use(`${API_PREFIX}/admin`, adminRoutes);
 app.use(`${API_PREFIX}/buyer`, buyerRoutes);
 app.use(`${API_PREFIX}/chat`, chatRouter);
+app.use(`${API_PREFIX}/notifications`, notificationRoutes);
+app.use(`${API_PREFIX}/stats`, statsRoute);
+app.use(`${API_PREFIX}/users`, userRoutes);
 
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({
