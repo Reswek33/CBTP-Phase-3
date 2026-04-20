@@ -554,6 +554,7 @@ export const authController = {
         .status(200)
         .json({ success: true, message: "Credentials updated successfully" });
     } catch (error) {
+      console.error(error);
       await logActivity(
         `Update credentials failed: ${error instanceof Error ? error.message : "Unknown error"}`,
         "ERROR",
