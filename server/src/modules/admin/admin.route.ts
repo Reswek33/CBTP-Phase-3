@@ -14,6 +14,7 @@ router
   .get("/logs", adminController.getActivityLogs)
   .get("/suppliers/pending", adminController.getPendingSuppliers)
   .patch("/suppliers/:id/verify", adminController.verifySupplier)
+  .patch("/buyer/:id/verify", adminController.verifyBuyer)
   .patch("/users/:id/status", adminController.toggleUserStatus)
   .get("/audit", adminController.getAllConversationsForAdmin);
 
