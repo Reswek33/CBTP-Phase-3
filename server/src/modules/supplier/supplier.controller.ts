@@ -57,6 +57,7 @@ export const supplierController = {
             userId: admin.id,
             type: "VERIFICATION_REQUEST",
             content: `New document upload from Supplier: ${user?.firstName} ${user?.lastName}`,
+            link: `/dashboard/admin/users/${userId}`,
             room: admin.id,
           });
         }),
