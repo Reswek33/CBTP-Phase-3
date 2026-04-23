@@ -5,6 +5,7 @@ import handleError from "../../shared/utils/error.js";
 import { logActivity } from "../../shared/utils/logger.js";
 import { getIO } from "../../config/socket.js";
 import { sendNotification } from "../../shared/utils/notification.js";
+import { deleteFileIfExists } from "../../shared/utils/fileCleanup.js";
 
 export const buyerController = {
   updateProfile: async (req: AuthenticatedRequest, res: Response) => {
@@ -143,6 +144,123 @@ export const buyerController = {
         },
       );
       handleError("DELETE /buyer/profile", err, res);
+    }
+  },
+
+  uploadDoc: async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.id!;
+    const file = req.file;
+
+    try {
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { documentType } = req.body;
+
+      const [document] = await prisma.$transaction([
+        prisma.buyerDocument.create({
+          data: {
+            buyerId: userId,
+            documentType: documentType || "BUSINESS_LICENSE",
+            fileName: file.originalname,
+            filePath: file.path,
+          },
+        }),
+        prisma.buyer.update({
+          where: { id: userId },
+          data: { status: "PENDING" },
+        }),
+      ]);
+
+      const admins = await prisma.user.findMany({
+        where: { role: { in: ["ADMIN", "SUPERADMIN"] } },
+        select: { id: true },
+      });
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, lastName: true },
+      });
+
+      await Promise.all([
+        sendNotification({
+          userId: userId!,
+          type: "DOCUMENT_UPLOADED",
+          content: `Your ${document.documentType} was uploaded. Status: PENDING review.`,
+          room: userId,
+        }),
+
+        ...admins.map((admin) => {
+          sendNotification({
+            userId: admin.id,
+            type: "VERIFICATION_REQUEST",
+            content: `New document upload from Supplier: ${user?.firstName} ${user?.lastName}`,
+            link: `/dashboard/admin/users/${userId}`,
+            room: admin.id,
+          });
+        }),
+
+        logActivity(
+          `Document uploaded: ${document.documentType}`,
+          "INFO",
+          userId,
+          "Buyer.uploadDocument",
+          undefined,
+          true, // Record as user action
+        ),
+      ]);
+
+      return res.status(201).json({
+        success: true,
+        message: "Document uploaded successfully",
+        data: document,
+      });
+    } catch (error) {
+      handleError("POST /supplier/upload", error, res);
+    }
+  },
+
+  deleteDoc: async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.id!;
+    const { docId } = req.params as { docId: string };
+
+    try {
+      const doc = await prisma.buyerDocument.findUnique({
+        where: { id: docId },
+      });
+
+      if (!doc || doc.buyerId !== userId) {
+        return res.status(403).json({ message: "Unauthorized or not found" });
+      }
+      if (doc.verifiedAt) {
+        return res.status(403).json({
+          success: false,
+          message: "Cannot delete verified documents",
+        });
+      }
+
+      await deleteFileIfExists(doc.filePath);
+
+      await prisma.supplierDocument.delete({ where: { id: docId } });
+
+      await sendNotification({
+        userId: userId!,
+        type: "DOCUMENT_DELETED",
+        content: `Document ${doc.documentType} has been removed from your profile.`,
+        room: userId,
+      });
+
+      await logActivity(
+        `Document deleted: ${doc.documentType}`,
+        "INFO",
+        userId,
+        "Supplier.deleteDocument",
+      );
+
+      res.status(200).json({ success: true, message: "Document removed" });
+    } catch (err) {
+      console.error("[BUYER_CONTROLLER_DELETE-DOC");
+      handleError("GET /supplier/bids", err, res);
     }
   },
 };
