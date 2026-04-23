@@ -13,6 +13,7 @@ import { Prisma } from "@prisma/client/extension";
 import type { AuthenticatedRequest } from "../../shared/middleware/authMiddleware.js";
 import { getIO } from "../../config/socket.js";
 import { sendNotification } from "../../shared/utils/notification.js";
+import { v4 as uuid } from "uuid";
 
 const saltRound = Number(process.env.SALT_ROUNDS) || 10;
 type TransactionClient = Prisma.TransactionClient;
@@ -30,11 +31,10 @@ export const authController = {
     try {
       // 1. Validate Input
       const data = registerInputSchema.parse(req.body);
-
       // 2. Check if user already exists
       const existingUser = await prisma.user.findFirst({
         where: {
-          OR: [{ email: data.email }, { username: data.username }],
+          email: data.email,
         },
       });
 
@@ -45,8 +45,12 @@ export const authController = {
         });
       }
 
+      const generateUsername =
+        data.firstName + Math.round(Math.random() * 10000);
+
       // 3. Hash Password
       const hashedPassword = await bcrypt.hash(data.password, saltRound);
+      const regNumber = `SUP-${uuid()}/${new Date().getFullYear()}`;
 
       // 4. Atomic Transaction: Create User + Profile
       const newUser = await prisma.$transaction(
@@ -55,7 +59,7 @@ export const authController = {
             data: {
               firstName: data.firstName,
               lastName: data.lastName,
-              username: data.username,
+              username: generateUsername,
               email: data.email,
               passwordHash: hashedPassword,
               role: data.role,
@@ -68,6 +72,13 @@ export const authController = {
               data: {
                 id: user.id, // Shared UUID from User
                 companyName: data.companyName || "New Company",
+                acceptLegalTerms: data.acceptLegalTerms,
+                address: data.companyAddress,
+                companyType: data.companyType,
+                position: data.position,
+                phone: data.phone,
+                industrySector: data.industrySector,
+                department: data.companyType,
               },
             });
           } else if (data.role === "SUPPLIER") {
@@ -76,6 +87,10 @@ export const authController = {
                 id: user.id, // Shared UUID from User
                 businessName: data.businessName || "New Business",
                 status: "PENDING",
+                acceptLegalTerms: data.acceptLegalTerms,
+                registrationNumber: regNumber,
+                phone: data.phone,
+                taxId: data.taxId,
               },
             });
           }
@@ -118,6 +133,7 @@ export const authController = {
           userId: newUser.id,
           type: "WELCOME",
           content: `Welcome to KAF Portal, ${newUser.firstName}! Please complete your profile.`,
+          link: "/dashboard/onboarding",
           room: newUser.id, // Targeted room
         }),
 
@@ -127,6 +143,7 @@ export const authController = {
             userId: admin.id,
             type: "USER_REGISTRATION",
             content: `New ${newUser.role} registered: ${newUser.firstName} ${newUser.lastName}`,
+            link: `/dashboard/admin/users/${newUser.id}`,
             room: admin.id, // Or "ADMIN_ROOM" if your socket setup supports it
           }),
         ),
@@ -295,10 +312,34 @@ export const authController = {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id, isActive: true },
-        include: {
+        where: { id: req.user.id },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          username: true,
+          email: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
           supplier: {
-            include: {
+            select: {
+              businessName: true,
+              phone: true,
+              address: true,
+              businessType: true,
+              taxId: true,
+              registrationNumber: true,
+              yearsInBusiness: true,
+              categories: true,
+              bio: true,
+              status: true,
+              verificationStatus: true,
+              verifiedAt: true,
+              rejectedReason: true,
+              createdAt: true,
+              updatedAt: true,
               documents: {
                 select: {
                   id: true,
@@ -309,17 +350,38 @@ export const authController = {
                   verifiedAt: true,
                   verifiedBy: true,
                 },
+                orderBy: { uploadedAt: "desc" },
               },
             },
           },
           buyer: {
             select: {
               companyName: true,
+              companyType: true,
+              taxId: true,
               phone: true,
+              industrySector: true,
               address: true,
               department: true,
               position: true,
+              status: true,
+              verificationStatus: true,
+              verifiedAt: true,
+              rejectedReason: true,
               createdAt: true,
+              updatedAt: true,
+              documents: {
+                select: {
+                  id: true,
+                  fileName: true,
+                  filePath: true,
+                  documentType: true,
+                  uploadedAt: true,
+                  verifiedAt: true,
+                  verifiedBy: true,
+                },
+                orderBy: { uploadedAt: "desc" },
+              },
             },
           },
         },
@@ -409,12 +471,6 @@ export const authController = {
 
       const decoded = verifyRefreshToken(refreshToken);
       if (!decoded || typeof decoded === "string") {
-        await logActivity(
-          "Refresh token attempt: Invalid or expired token",
-          "WARN",
-          undefined,
-          "AuthService.refreshToken",
-        );
         return res
           .status(401)
           .json({ message: "Invalid or expired refresh token" });
@@ -427,12 +483,6 @@ export const authController = {
       });
 
       if (!user) {
-        await logActivity(
-          `Refresh token failed: User ${id} not found or inactive`,
-          "WARN",
-          id,
-          "AuthService.refreshToken",
-        );
         return res
           .status(403)
           .json({ message: "User is inactive or not found" });
@@ -443,13 +493,6 @@ export const authController = {
         accessToken: newTokens.accessToken,
         refreshToken: newTokens.refreshToken,
       });
-
-      await logActivity(
-        "Tokens refreshed successfully",
-        "INFO",
-        user.id,
-        "AuthService.refreshToken",
-      );
 
       return res.json({ message: "Token refreshed successfully" });
     } catch (err) {
