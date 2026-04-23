@@ -22,6 +22,12 @@ enum SupplierStatus {
   REJECTED
 }
 
+enum BuyerStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
 enum RfpPriority {
   NORMAL
   URGENT
@@ -83,6 +89,7 @@ model User {
 
   @@index([username, role])
   @@map("users")
+  buyerDocuments BuyerDocument[] @relation("BuyerDocumentVerifier")
 }
 
 model Supplier {
@@ -90,11 +97,14 @@ model Supplier {
   businessName       String         @map("business_name")
   phone              String?
   address            String?
+  businessType       String?
+  acceptLegalTerms   Boolean?       @default(false)
   taxId              String?        @unique @map("tax_id")
   registrationNumber String?        @unique @map("registration_number")
   yearsInBusiness    Int?           @map("years_in_business")
   categories         String[]
   bio                String?
+  verificationStatus Boolean?       @default(false)
   status             SupplierStatus @default(PENDING)
   verifiedAt         DateTime?      @map("verified_at")
   rejectedReason     String?        @map("rejected_reason")
@@ -111,21 +121,47 @@ model Supplier {
 }
 
 model Buyer {
-  id          String   @id @db.Uuid
-  companyName String   @map("company_name")
-  phone       String?
-  address     String?
-  department  String?
-  position    String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                 String         @id @db.Uuid
+  companyName        String         @map("company_name")
+  companyType        String?        @map("company_type")
+  taxId              String?        @map("tax_id")
+  phone              String?
+  industrySector     String?        @map("industry_sector")
+  acceptLegalTerms   Boolean        @default(false)
+  address            String?
+  department         String?
+  position           String?
+  status             BuyerStatus    @default(PENDING)  // Changed from SupplierStatus
+  verificationStatus Boolean?       @default(false)
+  verifiedAt         DateTime?      @map("verified_at")
+  rejectedReason     String?        @map("rejected_reason")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
 
   // Relations
-  user          User           @relation(fields: [id], references: [id], onDelete: Cascade)
+  user          User               @relation(fields: [id], references: [id], onDelete: Cascade)
   rfps          Rfp[]
   conversations Conversation[]
+  documents     BuyerDocument[]    
 
   @@map("buyers")
+}
+
+model BuyerDocument {
+  id           String    @id @default(uuid()) @db.Uuid
+  buyerId      String    @map("buyer_id") @db.Uuid
+  documentType String    @map("document_type")
+  fileName     String    @map("file_name")
+  filePath     String    @map("file_path")
+  uploadedAt   DateTime  @default(now()) @map("uploaded_at")
+  verifiedBy   String?   @map("verified_by") @db.Uuid
+  verifiedAt   DateTime? @map("verified_at")
+
+  buyer    Buyer @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  verifier User? @relation("BuyerDocumentVerifier", fields: [verifiedBy], references: [id])
+
+  @@index([buyerId])
+  @@map("buyer_documents")
 }
 
 model Rfp {
@@ -245,7 +281,7 @@ model Conversation {
   buyer      Buyer     @relation(fields: [buyerId], references: [id])
   supplier   Supplier  @relation(fields: [supplierId], references: [id])
   messages   Message[]
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@unique([rfpId, buyerId, supplierId])
 }
