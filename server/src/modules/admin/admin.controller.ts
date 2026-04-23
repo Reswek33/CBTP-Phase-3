@@ -59,21 +59,23 @@ export const adminController = {
         content: isVerified
           ? "Congratulations! Your supplier profile has been verified. You can now bid on RFPs."
           : `Your verification was rejected. Reason: ${rejectedReason}`,
-        room: id,
+        room: updatedSupplier.user.id,
+        syncProfile: true,
       });
 
       // Emit specific event for UI state refresh
       io.to(id).emit("profile_sync", {
         status: updatedSupplier.status,
-        message: "Your account haas been updated",
+        message: isVerified
+          ? "Your account has been verified successfully"
+          : "Your verification was rejected",
+        timestamp: new Date().toISOString(),
       });
 
-      if (status === "REJECTED") {
-        io.to(id).emit("profile_sync", {
-          status: updatedSupplier.status,
-          message: "Document is rejected. Please update the document.",
-        });
-      }
+      io.to(updatedSupplier.user.id).emit("verification_status_changed", {
+        status: updatedSupplier.status,
+        isVerified: isVerified,
+      });
 
       await logActivity(
         `Supplier verification ${status}: ${id}`,
@@ -155,6 +157,7 @@ export const adminController = {
                 include: { _count: { select: { bids: true } } },
                 orderBy: { createdAt: "desc" },
               },
+              documents: true,
             },
           },
           activityLogs: { take: 10, orderBy: { createdAt: "desc" } },
@@ -380,7 +383,7 @@ export const adminController = {
         include: {
           buyer: { select: { companyName: true } },
           supplier: { select: { businessName: true } },
-          rfp: { select: { title: true } },
+          rfp: true,
         },
         orderBy: { createdAt: "desc" },
       });
@@ -388,6 +391,71 @@ export const adminController = {
       res.status(200).json({ success: true, data: conversations });
     } catch (error) {
       handleError("ADMIN_GET_CHATS", error, res);
+    }
+  },
+
+  verifyBuyer: async (req: AuthenticatedRequest, res: Response) => {
+    const { id } = req.params as { id: string };
+    const { status, rejectedReason } = req.body;
+    const adminId = req.user?.id!;
+    const io = getIO();
+    try {
+      const updateBuyer = await prisma.$transaction(async (tx) => {
+        const buyer = await tx.buyer.update({
+          where: { id: id },
+          data: {
+            status: status,
+            rejectedReason: status === "REJECTED" ? rejectedReason : null,
+            verifiedAt: status === "VERIFIED" ? new Date() : null,
+          },
+          include: { user: true },
+        });
+
+        await tx.buyerDocument.updateMany({
+          where: { buyerId: id, verifiedAt: null },
+          data: { verifiedBy: adminId, verifiedAt: new Date() },
+        });
+
+        return buyer;
+      });
+
+      const isVerified = status === "VERIFIED";
+      await sendNotification({
+        userId: id,
+        type: isVerified ? "ACCOUNT_VERIFIED" : "ACCOUNT_REJECTED",
+        content: isVerified
+          ? "Congratulations! Your Buyer profile has been verified. You can now bid on RFPs."
+          : `Your verification was rejected. Reason: ${rejectedReason}`,
+        room: updateBuyer.user.id,
+        syncProfile: true,
+      });
+
+      io.to(id).emit("profile_sync", {
+        status: updateBuyer.status,
+        message: isVerified
+          ? "Your account has been verified successfully"
+          : "Your verification was rejected",
+        timestamp: new Date().toISOString(),
+      });
+
+      io.to(updateBuyer.user.id).emit("verification_status_changed", {
+        status: updateBuyer.status,
+        isVerified: isVerified,
+      });
+
+      await logActivity(
+        `Buyer verification ${status}: ${id}`,
+        "INFO",
+        adminId,
+        "AdminController.verifyBuyer",
+        { status, rejectedReason },
+        true,
+      );
+
+      res.status(200).json({ success: true, data: updateBuyer });
+    } catch (err) {
+      console.error("[VERIFY_BUYER_ADMIN]", err);
+      handleError("PATCH /admin/status", err, res);
     }
   },
 };
