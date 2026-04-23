@@ -25,19 +25,18 @@ export const initSocket = (server: HttpServer) => {
       console.log(`User ${userId} joined their personal room`);
 
       // 2. Identify and Join Admin Room
-      try {
-        const user = await prisma.user.findUnique({
+      prisma.user
+        .findUnique({
           where: { id: userId },
           select: { role: true },
+        })
+        .then((user) => {
+          if (user) {
+            socket.join(`role:${user.role}`);
+            console.log(`User ${userId} joined role room: role:${user.role}`);
+          }
         });
-
-        if (user?.role === "ADMIN" || user?.role === "SUPERADMIN") {
-          socket.join("ADMIN_ROOM");
-          console.log(`🛡️ Admin ${userId} joined ADMIN_ROOM`);
-        }
-      } catch (error) {
-        console.error("Socket Auth Error:", error);
-      }
+      socket.emit("connected", { userId, timestamp: new Date().toISOString() });
     }
 
     // --- Dynamic Room Handlers ---
