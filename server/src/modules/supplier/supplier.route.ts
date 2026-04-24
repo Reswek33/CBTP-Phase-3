@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { upload } from "../../config/multer.js";
+import { upload, multerErrorHandler } from "../../config/multer.js";
 import { supplierController } from "./supplier.controller.js";
 import {
   authenticateUser,
@@ -11,7 +11,14 @@ router
   .use(authenticateUser, requireRole(["SUPPLIER"]))
   .post(
     "/documents",
-    upload.single("business_doc"), // The field name the frontend must use
+    (req, res, next) => {
+      upload.single("business_doc")(req, res, (err) => {
+        if (err) {
+          return multerErrorHandler(err, req, res, next);
+        }
+        next();
+      });
+    },
     supplierController.uploadDocument,
   )
   .patch("/profile", supplierController.updateProfile)

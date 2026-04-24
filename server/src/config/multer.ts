@@ -1,4 +1,4 @@
-import multer from "multer";
+import multer, { MulterError } from "multer";
 import path from "path";
 import fs from "fs";
 import { v2 as cloudinary } from "cloudinary";
@@ -45,19 +45,57 @@ const cloudinaryStorage = new CloudinaryStorage({
 });
 
 // --- 3. HYBRID LOGIC ---
-// If production, use Cloudinary. Otherwise, use Local Disk.
 const selectedStorage = isProduction ? cloudinaryStorage : localStorage;
+
+// Custom error handler for multer
+export const multerErrorHandler = (err: any, req: any, res: any, next: any) => {
+  if (err instanceof MulterError) {
+    // Multer-specific errors
+    const errorMessages: Record<string, string> = {
+      LIMIT_FILE_SIZE: "File too large. Maximum size is 5MB.",
+      LIMIT_FILE_COUNT: "Too many files uploaded.",
+      LIMIT_FIELD_KEY: "Invalid field name.",
+      LIMIT_FIELD_VALUE: "Invalid field value.",
+      LIMIT_FIELD_COUNT: "Too many fields.",
+      LIMIT_UNEXPECTED_FILE: "Unexpected file field.",
+    };
+
+    const message = errorMessages[err.code] || err.message;
+
+    return res.status(400).json({
+      success: false,
+      message,
+      code: err.code,
+      field: err.field,
+    });
+  }
+
+  // Handle file filter errors (custom validation)
+  if (err && err.message === "Only .png, .jpg and .pdf format allowed!") {
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+      code: "INVALID_FILE_TYPE",
+    });
+  }
+
+  // Pass other errors to next middleware
+  next(err);
+};
 
 export const upload = multer({
   storage: selectedStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|pdf/;
     const isValid =
       allowedTypes.test(file.mimetype) ||
       allowedTypes.test(file.originalname.toLowerCase());
 
-    if (isValid) return cb(null, true);
-    cb(new Error("Only .png, .jpg and .pdf format allowed!") as any);
+    if (isValid) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only .png, .jpg and .pdf format allowed!") as any);
+    }
   },
 });
