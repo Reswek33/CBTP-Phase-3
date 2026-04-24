@@ -44,6 +44,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 const BASE_URL = isProduction ? vpsURL : "http://localhost:5173";
+console.log("BASE_URL: ", BASE_URL);
 
 app.use(
   cors({
