@@ -1,16 +1,15 @@
 FROM node:18-alpine
-
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev 
 
 COPY . .
 
 RUN npx prisma generate
 
-RUN npm run build
+RUN npm run build 
 
-EXPOSE 5000
+EXPOSE 10000
 
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
