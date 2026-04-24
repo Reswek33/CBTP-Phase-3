@@ -3,7 +3,7 @@ FROM node:18-alpine
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci --only=production
 
 COPY . .
 
@@ -11,4 +11,6 @@ RUN npx prisma generate
 
 RUN npm run build
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+EXPOSE 5000
+
+CMD ["node", "dist/index.js"]
