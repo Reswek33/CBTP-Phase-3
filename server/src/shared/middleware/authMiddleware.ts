@@ -16,8 +16,6 @@ export const authenticateUser = (
   try {
     // Check Authorization header first
     const authHeader = req.headers.authorization;
-    console.log("[REQUEST_HEADERS]", req.headers);
-    console.log("[AUTH_HEADER_MIDDLEWARE]", authHeader);
     // If no Authorization header, check cookies
     let token: string | undefined;
 

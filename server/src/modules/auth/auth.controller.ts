@@ -287,7 +287,6 @@ export const authController = {
    */
   me: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      console.log("[GET_ME]", req.user);
       if (!req.user) {
         return res.status(401).json({
           success: false,

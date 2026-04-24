@@ -7,7 +7,6 @@ const REFRESH_TOKEN_SECRET =
 const ACCESS_EXPIRES_IN = process.env.ACCESS_EXPIRES_IN || "15m";
 const REFRESH_EXPIRES_IN = process.env.REFRESH_EXPIRES_IN || "7d";
 const isProduction = process.env.NODE_ENV === "production";
-console.log("[NODE_ENV]", isProduction);
 
 interface TokenPayload {
   id: string;
