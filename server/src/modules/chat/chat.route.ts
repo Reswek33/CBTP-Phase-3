@@ -9,6 +9,8 @@ router
   .get("/", chatController.getUserConversations)
   .post("/initialize", chatController.getOrCreateConversation)
   .get("/:conversationId/messages", chatController.getMessages)
-  .post("/message", chatController.sendMessage);
+  .post("/message", chatController.sendMessage)
+  .post("/mark/:conversationId", chatController.markMessageAsRead)
+  .get("/unread-count", chatController.getUnreadMessage);
 
 export default router;

@@ -137,15 +137,52 @@ export const chatController = {
           },
         },
         orderBy: {
-          // You could technically add an 'updatedAt' to Conversation model
-          // to sort by most recent activity, but for now we use ID or a default
           id: "desc",
         },
       });
 
+      const lastMessages = await prisma.$transaction(
+        conversations.map((conv) =>
+          prisma.message.findFirst({
+            where: { conversationId: conv.id },
+            orderBy: { createdAt: "desc" },
+            select: {
+              content: true,
+              createdAt: true,
+              isRead: true,
+              senderId: true,
+            },
+          }),
+        ),
+      );
+
+      const unreadCounts = await prisma.$transaction(
+        conversations.map((conv) =>
+          prisma.message.count({
+            where: {
+              conversationId: conv.id,
+              senderId: { not: userId },
+              isRead: false,
+            },
+          }),
+        ),
+      );
+
+      const transformedConversations = conversations.map((conv, index) => ({
+        id: conv.id,
+        rfpId: conv.rfpId,
+        buyerId: conv.buyerId,
+        supplierId: conv.supplierId,
+        createdAt: conv.createdAt,
+        buyer: conv.buyer,
+        supplier: conv.supplier,
+        rfp: conv.rfp,
+        lastMessage: lastMessages[index],
+        unreadCount: unreadCounts[index],
+      }));
       return res.status(200).json({
         success: true,
-        data: conversations,
+        data: transformedConversations,
       });
     } catch (error) {
       console.error("[CHAT_CONTROLLER_GET_USER_CONVERSATIONS]", error);
@@ -199,6 +236,67 @@ export const chatController = {
       });
     } catch (error) {
       handleError("GET /chat/:conversationId/messages", error, res);
+    }
+  },
+
+  markMessageAsRead: async (req: AuthenticatedRequest, res: Response) => {
+    const { conversationId } = req.params as { conversationId: string };
+    const userId = req.user?.id;
+    const io = getIO();
+
+    try {
+      await prisma.message.updateMany({
+        where: {
+          conversationId: conversationId,
+          senderId: { not: userId },
+          isRead: false,
+        },
+        data: { isRead: true, readAt: new Date() },
+      });
+
+      const updatedConversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: {
+          messages: {
+            where: {
+              senderId: { not: userId },
+              isRead: false,
+            },
+          },
+        },
+      });
+
+      const unreadCount = updatedConversation?.messages.length || 0;
+      const io = getIO();
+      io.to(conversationId).emit("messages_read", {
+        conversationId,
+        userId,
+        unreadCount,
+      });
+
+      res.json({
+        success: true,
+        message: "Messages marked as read",
+        unreadCount,
+      });
+    } catch (err) {
+      handleError("PATCH /mark", err, res);
+    }
+  },
+
+  getUnreadMessage: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id!;
+      const unreadMessages = await prisma.message.findMany({
+        where: { id: userId, isRead: false },
+      });
+
+      return res.status(200).json({
+        success: true,
+        count: unreadMessages.length,
+      });
+    } catch (err) {
+      handleError("GET /chat/unread-count", err, res);
     }
   },
 };
