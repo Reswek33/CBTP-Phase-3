@@ -12,21 +12,74 @@ export const loginInputSchema = z.object({
   password: z.string().min(1, "Password is required!!"),
 });
 
-export const meSchema = z.object({
-  success: z.boolean(),
-  user: z.object({
-    id: z.uuid(),
-    username: z.string(),
-    role: z
-      .enum(["SUPERADMIN", "ADMIN", "BUYER", "SUPLIER"])
-      .optional()
-      .nullable(),
-    isActive: z.boolean().optional().nullable(),
+const baseUserSchema = {
+  id: z.uuid(),
+  username: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  email: z.email(),
+  isActive: z.boolean(),
+  createdAt: z.coerce.date(),
+};
 
-    createdAt: z.string().or(z.date()).nullable().optional(),
-  }),
+const supplierProfileSchema = z.object({
+  status: z.string().nullable(),
+  phone: z.string().nullable(),
+  address: z.string().nullable(),
+  businessName: z.string().nullable(),
+  taxId: z.string().nullable(),
+  registrationNumber: z.string().nullable(),
+  verificationStatus: z.boolean().nullable(),
+  businessType: z.string().nullable(),
+  acceptLegalTerms: z.boolean().nullable().optional(),
+  yearsInBusiness: z.number().nullable(),
+  categories: z.array(z.string()).nullable(),
+  bio: z.string().nullable(),
+  rejectedReason: z.string().nullable(),
+  documents: z.array(z.any()).optional().nullable(),
 });
 
+const buyerProfileSchema = z.object({
+  companyName: z.string().nullable(),
+  companyType: z.string().nullable(),
+  industrySector: z.string().nullable(),
+  status: z.string().nullable(),
+  taxId: z.string().nullable(),
+  phone: z.string().nullable(),
+  address: z.string().nullable(),
+  department: z.string().nullable(),
+  position: z.string().nullable(),
+  documents: z.array(z.any()).optional().nullable(),
+});
+
+const supplierUserSchema = z.object({
+  ...baseUserSchema,
+  role: z.literal("SUPPLIER"),
+  supplier: supplierProfileSchema,
+  buyer: z.null().optional(),
+});
+
+const buyerUserSchema = z.object({
+  ...baseUserSchema,
+  role: z.literal("BUYER"),
+  buyer: buyerProfileSchema,
+  supplier: z.null().optional(),
+});
+
+const adminUserSchema = z.object({
+  ...baseUserSchema,
+  role: z.enum(["SUPERADMIN", "ADMIN"]),
+  supplier: z.null().optional(),
+  buyer: z.null().optional(),
+});
+export const meSchema = z.object({
+  success: z.boolean(),
+  user: z.discriminatedUnion("role", [
+    supplierUserSchema,
+    buyerUserSchema,
+    adminUserSchema,
+  ]),
+});
 export const logoutSchema = z.object({
   success: z.boolean(),
   message: z.string(),
@@ -66,8 +119,10 @@ export const registerResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   user: z.object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     username: z.string(),
+    firstName: z.string(),
+    lastName: z.string(),
     email: z.string(),
     role: z.enum(["ADMIN", "SUPERADMIN", "BUYER", "SUPPLIER"]),
     isActive: z.boolean(),

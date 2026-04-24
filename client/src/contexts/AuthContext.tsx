@@ -17,6 +17,7 @@ interface AuthContextType {
   login: (data: LoginInput) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,6 +71,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       window.dispatchEvent(new Event("authLogout"));
     }
   };
+  const refreshUser = async (): Promise<void> => {
+    try {
+      const userData = await getMe();
+      setUser(userData?.user);
+    } catch (error) {
+      console.error("Failed to refresh user data: ", error);
+      throw error;
+    }
+  };
 
   useEffect(() => {
     checkAuth();
@@ -95,6 +105,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     login,
     logout,
     checkAuth,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

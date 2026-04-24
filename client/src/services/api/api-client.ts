@@ -6,10 +6,11 @@ const isProduction =
   import.meta.env.VITE_NODE_ENV === "production" ||
   import.meta.env.VITE_NODE_ENV === "PRODUCTION";
 const vpsURL = import.meta.env.VITE_BASE_URL;
-const baseURL = isProduction ? vpsURL : "http://localhost:5000/api/v1";
+export const baseURL = isProduction ? vpsURL : "http://localhost:5000";
+const API_PREFIX = import.meta.env.VITE_API_PREFIX || "/api/v1";
 
 export const api = axios.create({
-  baseURL: baseURL,
+  baseURL: `${baseURL}${API_PREFIX}`,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",

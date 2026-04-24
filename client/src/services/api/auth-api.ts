@@ -43,3 +43,16 @@ export const getMe = async (): Promise<Me> => {
 export const postRefresh = async () => {
   await api.post("/auth/refresh");
 };
+
+export const postRegister = async (data: unknown) => {
+  const response = await api.post("/auth/register", data);
+  return response.data;
+};
+
+export const updateCredentials = async (data: {
+  tempPassword: string;
+  newPassword: string;
+}) => {
+  const response = await api.patch("/auth/update", data);
+  return response.data;
+};
