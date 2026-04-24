@@ -27,11 +27,16 @@ export const registerInputSchema = z
   .object({
     firstName: z.string().min(2, "First name is required"),
     lastName: z.string().min(2, "Last name is required"),
-    username: z.string().min(3, "Username must be at least 3 characters"),
+    username: z.string().optional(),
     email: z.email("Invalid email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     role: z.enum(["BUYER", "SUPPLIER"]),
-
+    companyAddress: z.string().optional(),
+    companyType: z.string().optional(),
+    position: z.string().optional(),
+    phone: z.string().optional(),
+    industrySector: z.string().optional(),
+    acceptLegalTerms: z.boolean().default(false),
     // Conditional Profile Data
     companyName: z.string().optional(),
     businessName: z.string().optional(),
