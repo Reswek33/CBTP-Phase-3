@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { upload, multerErrorHandler } from "../../config/multer.js";
+import { handleFileUpload } from "../../config/multer.js";
 import { supplierController } from "./supplier.controller.js";
 import {
   authenticateUser,
@@ -11,14 +11,7 @@ router
   .use(authenticateUser, requireRole(["SUPPLIER"]))
   .post(
     "/documents",
-    (req, res, next) => {
-      upload.single("business_doc")(req, res, (err) => {
-        if (err) {
-          return multerErrorHandler(err, req, res, next);
-        }
-        next();
-      });
-    },
+    handleFileUpload("business_doc"),
     supplierController.uploadDocument,
   )
   .patch("/profile", supplierController.updateProfile)

@@ -84,6 +84,12 @@ export const supplierController = {
 
   updateProfile: async (req: AuthenticatedRequest, res: Response) => {
     try {
+      console.log("Upload request:", {
+        file: req.file,
+        body: req.body,
+        userId: req.user?.id,
+        headers: req.headers["content-type"],
+      });
       const userId = req.user?.id!;
       const io = getIO();
       const {

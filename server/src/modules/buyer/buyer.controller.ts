@@ -134,6 +134,12 @@ export const buyerController = {
     const file = req.file;
 
     try {
+      console.log("Upload request:", {
+        file: req.file,
+        body: req.body,
+        userId: req.user?.id,
+        headers: req.headers["content-type"],
+      });
       if (!file) {
         return res.status(400).json({ message: "No file uploaded" });
       }

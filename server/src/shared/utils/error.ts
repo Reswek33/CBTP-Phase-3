@@ -31,6 +31,29 @@ const errorStatusMap: Record<string, number> = {
   P2022: 500, // Column doesn't exist
 };
 
+// Helper function to safely extract error message from any error type
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    // Try to extract useful info from object
+    const err = error as any;
+    if (err.message) return err.message;
+    if (err.error)
+      return typeof err.error === "string"
+        ? err.error
+        : JSON.stringify(err.error);
+    if (err.code && err.code === "LIMIT_FILE_SIZE") return "File too large";
+    if (err.code && err.code === "INVALID_FILE_TYPE")
+      return "Invalid file type";
+    if (err.code && err.code === "STORAGE_ERROR")
+      return "Storage service error";
+    // Return JSON string for debugging but don't expose to client
+    return JSON.stringify(error);
+  }
+  return String(error);
+};
+
 // User-friendly error messages
 const getUserFriendlyMessage = (errorCode: string, meta?: any): string => {
   const targetField =
@@ -327,27 +350,35 @@ const handleError = async (
     }
   }
 
-  // Unknown/unhandled errors
+  // Unknown/unhandled errors (including multer/cloudinary errors)
   else {
     statusCode = 500;
     logLevel = "CRITICAL";
+
+    // Extract meaningful error message from unknown error types
+    const errorMessage = getErrorMessage(error);
+
     response = {
       success: false,
       route,
       message: "An unexpected error occurred",
     };
 
+    // Log the actual error for debugging (full details)
+    console.error(`[${route}] Detailed Error:`, error);
+
     await logActivity(
-      `Unhandled error in ${route}`,
+      `Unhandled error in ${route}: ${errorMessage}`,
       "CRITICAL",
       userId,
       route,
-      { error: String(error) },
+      {
+        errorType: typeof error,
+        errorMessage: errorMessage,
+        fullError: process.env.NODE_ENV === "development" ? error : undefined,
+      },
       false,
     );
-
-    // Log to console for immediate visibility
-    console.error(`[${route}] Unhandled Error:`, error);
   }
 
   // Add environment-specific details in development
@@ -358,7 +389,9 @@ const handleError = async (
         ...(error.stack && { stack: error.stack }),
       };
     } else {
-      response.details = String(error);
+      const errorMessage = getErrorMessage(error);
+      response.details =
+        errorMessage !== "[object Object]" ? errorMessage : String(error);
     }
 
     if (error instanceof Error && error.stack) {
