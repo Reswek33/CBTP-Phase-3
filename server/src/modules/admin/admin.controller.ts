@@ -15,12 +15,6 @@ export const adminController = {
       });
       res.status(200).json({ success: true, data: pending });
     } catch (err) {
-      await logActivity(
-        `Failed to fetch pending suppliers: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "Admin.getPendingSuppliers",
-      );
       console.error("[ADMIN_VERIFY_SUPPLIER]", err);
       handleError("PATCH /admin/status", err, res);
     }
@@ -88,12 +82,6 @@ export const adminController = {
 
       res.status(200).json({ success: true, data: updatedSupplier });
     } catch (err) {
-      await logActivity(
-        `Failed to verify supplier ${id}: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "Admin.verifySupplier",
-      );
       console.error("[ADMIN_VERIFY_SUPPLIER]", err);
       handleError("PATCH /admin/status", err, res);
     }
@@ -124,12 +112,6 @@ export const adminController = {
       });
       res.status(200).json({ success: true, users });
     } catch (err) {
-      await logActivity(
-        `Failed to fetch all users: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "Admin.getAllUsers",
-      );
       console.error("[ADMIN_GET_ALL_USERS]", err);
       handleError("GET /admin/users", err, res);
     }
@@ -167,12 +149,6 @@ export const adminController = {
       if (!user) return res.status(404).json({ message: "User not found" });
       res.json({ success: true, user });
     } catch (error) {
-      await logActivity(
-        `Failed to fetch user details for ${id}: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "Admin.getUserDetails",
-      );
       console.log("ADMIN_CONTROLLER_USER_DETAIL", error);
       handleError("GET /admin/user-details", error, res);
     }
@@ -291,12 +267,6 @@ export const adminController = {
 
       return res.status(200).json(response);
     } catch (error) {
-      await logActivity(
-        `Failed to fetch activity logs: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "Admin.getActivityLogs",
-      );
       console.error("[ADMIN_CONTROLLER_GET_ACTIVITY_LOGS]", error);
       handleError("GET /admin/logs", error, res);
     }
@@ -334,12 +304,6 @@ export const adminController = {
 
       res.status(200).json({ success: true, message: "User status updated" });
     } catch (err) {
-      await logActivity(
-        `Failed to ${isActive ? "activate" : "deactivate"} user ${id}`,
-        "ERROR",
-        req.user?.id,
-        "Admin.toggleStatus",
-      );
       console.error("[ADMIN_TOGGLE_USER_STATUS]", err);
       handleError("PATCH /admin/users/:id/status", err, res);
     }
@@ -359,12 +323,6 @@ export const adminController = {
         .status(200)
         .json({ success: true, message: "User wiped from system" });
     } catch (err) {
-      await logActivity(
-        `Failed to permanently delete user ${id}`,
-        "ERROR",
-        req.user?.id,
-        "Admin.deleteUserPermanently",
-      );
       console.error("[ADMIN_DELETE_USER_PERMANENTLY]", err);
       handleError("DELETE /admin/users/:id", err, res);
     }

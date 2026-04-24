@@ -200,12 +200,6 @@ export const rfpsController = {
         data: responseData,
       });
     } catch (error) {
-      await logActivity(
-        `Failed to fetch RFP ${req.params.id}: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "rfps.listById",
-      );
       console.log("[RFP_CONTROLLER_LIST_BY_ID]", error);
       handleError("GET /rfps/:id", error, res);
     }

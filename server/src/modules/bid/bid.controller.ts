@@ -67,12 +67,6 @@ export const bidController = {
         data: result,
       });
     } catch (error) {
-      await logActivity(
-        `Failed to create bid on RFP ${req.params.rfpId}: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "bids.create",
-      );
       console.log("[BID_CONTROLLER_CREATE_BID]", error);
       handleError("POST /bid", error, res);
     }
@@ -113,12 +107,6 @@ export const bidController = {
         data: bids,
       });
     } catch (error) {
-      await logActivity(
-        `Failed to fetch bids list: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "bids.getMany",
-      );
       console.log("[BID_CONTROLLER_GET_BIDS]");
       handleError("GET /bids", error, res);
     }
@@ -274,12 +262,6 @@ export const bidController = {
         data: bid,
       });
     } catch (error) {
-      await logActivity(
-        `Failed to fetch bid ${req.params.id}: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "bids.getOne",
-      );
       console.error("[BID_CONTROLLER_GET_BID_BY_ID]", error);
       handleError("GET /bid/:id", error, res);
     }
@@ -325,12 +307,6 @@ export const bidController = {
         data: updatedBid,
       });
     } catch (error) {
-      await logActivity(
-        `Failed to submit financial bid for ${bidId}: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "ERROR",
-        userId,
-        "bids.submitFinancial",
-      );
       console.error("BID_CONTROLLER_SUBMIT_FINANCIAL_BID", error);
       handleError("POST /bids/:bidId/submit-amount", error, res);
     }
@@ -459,12 +435,6 @@ export const bidController = {
 
       res.json({ success: true, message: "Bid withdrawn successfully" });
     } catch (err) {
-      await logActivity(
-        `Failed to withdraw bid ${bidId}: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        userId,
-        "bids.withdraw",
-      );
       console.error("BID_CONTROLLER_WITHDRAW_BID", err);
       handleError("PATCH /bids/:bidId/withdraw", err, res);
     }

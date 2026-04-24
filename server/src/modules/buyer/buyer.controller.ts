@@ -66,16 +66,7 @@ export const buyerController = {
       res.status(200).json({ success: true, data: updated });
     } catch (err) {
       // Log failed profile update attempt
-      await logActivity(
-        `Failed to update buyer profile: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        userId,
-        "buyer.updateProfile",
-        {
-          attemptedFields: Object.keys(req.body),
-          error: err instanceof Error ? err.message : "Unknown error",
-        },
-      );
+      console.log("[BUYER_CONTROLLER_UPDATE_PROFILE]", err);
       handleError("PATCH /buyer/profile", err, res);
     }
   },
@@ -133,16 +124,7 @@ export const buyerController = {
       res.status(200).json({ success: true, message: "Account deactivated" });
     } catch (err) {
       // Log failed deactivation attempt
-      await logActivity(
-        `Failed to deactivate buyer account: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        userId,
-        "buyer.deleteAccount",
-        {
-          error: err instanceof Error ? err.message : "Unknown error",
-          userId,
-        },
-      );
+      console.log("[BUYER_CONTROLLER_DELETE_ACCOUTN]", err);
       handleError("DELETE /buyer/profile", err, res);
     }
   },
@@ -216,6 +198,7 @@ export const buyerController = {
         data: document,
       });
     } catch (error) {
+      console.log("[BUYER_CONTROLLER_UPLOAD_DOC]", error);
       handleError("POST /supplier/upload", error, res);
     }
   },
@@ -259,7 +242,7 @@ export const buyerController = {
 
       res.status(200).json({ success: true, message: "Document removed" });
     } catch (err) {
-      console.error("[BUYER_CONTROLLER_DELETE-DOC");
+      console.error("[BUYER_CONTROLLER_DELETE-DOC", err);
       handleError("GET /supplier/bids", err, res);
     }
   },

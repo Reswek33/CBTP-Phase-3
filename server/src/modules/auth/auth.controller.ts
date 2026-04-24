@@ -160,13 +160,7 @@ export const authController = {
         },
       });
     } catch (err) {
-      await logActivity(
-        `Registration failed: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        undefined,
-        "AuthService.register",
-      );
-      console.error(err);
+      console.error("[AUTH_CONTROLLER_REGISTER]", err);
       handleError("POST /auth/register", err, res);
     }
   },
@@ -254,13 +248,7 @@ export const authController = {
         isActive: user.isActive,
       });
     } catch (err) {
-      await logActivity(
-        `Login failed: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        undefined,
-        "AuthService.login",
-      );
-      console.error(err);
+      console.error("[AUTH_CONTROLLER_LOGIN]", err);
       handleError("POST /auth/login", err, res);
     }
   },
@@ -288,12 +276,7 @@ export const authController = {
         );
       }
     } catch (err) {
-      await logActivity(
-        `Logout failed: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        undefined,
-        "AuthService.logout",
-      );
+      console.log("[AUTH_CONTROLLER_LOGOUT]", err);
       handleError("DELETE /auth/logout", err, res);
     }
   },
@@ -442,12 +425,6 @@ export const authController = {
         user: responseUser,
       });
     } catch (err) {
-      await logActivity(
-        `Failed to fetch user profile: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "AuthService.me",
-      );
       console.error("[AUTH_ME_ERROR]", err);
       handleError("GET /auth/me", err, res);
     }
@@ -496,12 +473,7 @@ export const authController = {
 
       return res.json({ message: "Token refreshed successfully" });
     } catch (err) {
-      await logActivity(
-        `Refresh token failed: ${err instanceof Error ? err.message : "Unknown error"}`,
-        "ERROR",
-        undefined,
-        "AuthService.refreshToken",
-      );
+      console.log("[AUTH_CONTROLLER_REFRESH_TOKEN]", err);
       handleError("POST /auth/refresh", err, res);
     }
   },
@@ -597,13 +569,8 @@ export const authController = {
         .status(200)
         .json({ success: true, message: "Credentials updated successfully" });
     } catch (error) {
-      console.error(error);
-      await logActivity(
-        `Update credentials failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "ERROR",
-        req.user?.id,
-        "AuthService.updateCredentials",
-      );
+      console.error("[AUTH_CONTROLLER_UPDATE_CREDENTIAL]", error);
+
       handleError("PATCH /auth/update", error, res);
     }
   },
