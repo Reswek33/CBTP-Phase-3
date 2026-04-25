@@ -67,8 +67,8 @@ const cloudinaryStorage = new CloudinaryStorage({
             : "kaf_portal/documents",
         resource_type: "auto",
         public_id: `${file.fieldname}-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-        // Add timeout to prevent hanging
         timeout: 60000,
+        access_mode: "public",
       };
     } catch (error) {
       console.error("Cloudinary params error:", error);
