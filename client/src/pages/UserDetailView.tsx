@@ -104,6 +104,17 @@ interface UserDetail {
   activityLogs: ActivityLog[];
 }
 
+const getFileUrl = (filePath: string): string => {
+  if (!filePath) return "";
+
+  if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+    return filePath;
+  }
+
+  const apiUrl = "http://localhost:5000";
+  return `${apiUrl}/${filePath}`;
+};
+
 // Document Viewer Modal Component
 const DocumentViewerModal: React.FC<{
   isOpen: boolean;
@@ -112,7 +123,8 @@ const DocumentViewerModal: React.FC<{
 }> = ({ isOpen, document, onClose }) => {
   if (!isOpen || !document) return null;
 
-  const fileUrl = `http://localhost:5000/${document.filePath}`;
+  const fileUrl = getFileUrl(document.filePath);
+  console.log("fileUrl", fileUrl);
   const isImage = document.fileName.match(/\.(jpg|jpeg|png|gif|webp)$/i);
   const isPDF = document.fileName.match(/\.pdf$/i);
 

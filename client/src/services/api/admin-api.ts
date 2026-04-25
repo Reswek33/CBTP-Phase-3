@@ -17,7 +17,6 @@ export const getAllUsers = async () => {
 };
 export const getUserDetails = async (id: string) => {
   const response = await api.get(`/admin/users/${id}`);
-  console.log(response.data);
   return response.data;
 };
 export const getPendingSuppliers = async () => {
