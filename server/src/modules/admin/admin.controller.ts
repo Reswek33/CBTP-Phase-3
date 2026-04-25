@@ -147,7 +147,8 @@ export const adminController = {
       });
 
       if (!user) return res.status(404).json({ message: "User not found" });
-      res.json({ success: true, user });
+      const { passwordHash, ...userData } = user;
+      return res.json({ success: true, user: userData });
     } catch (error) {
       console.log("ADMIN_CONTROLLER_USER_DETAIL", error);
       handleError("GET /admin/user-details", error, res);
