@@ -47,7 +47,7 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 const allowedOrigins = [
   "http://localhost:5173",
   "https://bidsync-app.ezedin.me",
-  "https://bid-sync-frontend.vercel.app",
+  "https://bid-sync-blush.vercel.app",
 ];
 
 app.use(
