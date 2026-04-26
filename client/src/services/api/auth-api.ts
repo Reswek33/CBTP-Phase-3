@@ -4,6 +4,8 @@ import {
   type LoginInput,
   type Logout,
   type Me,
+  type OtpInput,
+  type ResendOtpInput,
 } from "../../schemas/auth-schema";
 import { errorHandler } from "../../util/errorHandler";
 import { api } from "./api-client";
@@ -16,6 +18,16 @@ export const postLogin = async (data: LoginInput): Promise<Login> => {
     errorHandler("Auth", error);
     throw new Error("smtg wrong");
   }
+};
+
+export const postOtp = async (data: OtpInput) => {
+  const response = await api.post("/auth/verify-email", data);
+  return response.data;
+};
+
+export const resendOtp = async (data: ResendOtpInput) => {
+  const response = await api.post("/auth/resend-otp", data);
+  return response.data;
 };
 
 export const postLogout = async (): Promise<Logout> => {

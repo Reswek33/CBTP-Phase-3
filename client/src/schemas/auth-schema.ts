@@ -129,8 +129,18 @@ export const registerResponseSchema = z.object({
   }),
 });
 
+export const otpVerificationInputSchema = z.object({
+  email: z.email(),
+  otp: z.string(),
+});
+
+export const resendOtpSchema = z.object({
+  email: z.email(),
+});
 // Types
 export type RegisterInput = z.infer<typeof registerInputSchema>;
+export type OtpInput = z.infer<typeof otpVerificationInputSchema>;
+export type ResendOtpInput = z.infer<typeof resendOtpSchema>;
 export type RegisterResponse = z.infer<typeof registerResponseSchema>;
 export type Logout = z.infer<typeof logoutSchema>;
 export type Me = z.infer<typeof meSchema>;

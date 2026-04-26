@@ -11,6 +11,8 @@ import SupplierRegister from "@/components/auth/register/SupplierRegister";
 import { ErrorPage } from "@/pages/ErrorPage";
 import { UnauthorizedPage } from "@/pages/UnauthorizedPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import { VerifyOtpPage } from "@/pages/VerifyOtpPage";
+import LissajousLoader from "@/components/ui/LissajousDrift";
 
 // 1. Lazy load ALL page components
 const Login = lazy(() => import("../pages/LoginPage"));
@@ -44,22 +46,23 @@ const UserDetailView = lazy(() =>
   })),
 );
 
-// Helper for loading states
+// Helper for loading states - Using LissajousLoader for better UX
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-white">
-    <div className="text-center">
-      <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-      <p className="text-slate-500 font-medium">Loading...</p>
-    </div>
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <LissajousLoader size={300} showFormula={false} loadingText="Loading..." />
   </div>
 );
 
-// Helper for unauthorized page
-
+// Component wrapper for dashboard rout
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <LandingPage />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/verify-otp",
+    element: <VerifyOtpPage />,
     errorElement: <ErrorPage />,
   },
   {
@@ -92,37 +95,65 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <DashboardHome />,
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <DashboardHome />
+          </Suspense>
+        ),
         errorElement: <ErrorPage />,
       },
       {
         path: "onboarding",
-        element: <SupplierOnboardingPage />,
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <SupplierOnboardingPage />
+          </Suspense>
+        ),
         errorElement: <ErrorPage />,
       },
       {
         path: "rfps",
-        element: <RfpsPage />,
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <RfpsPage />
+          </Suspense>
+        ),
         errorElement: <ErrorPage />,
       },
       {
         path: "rfps/create",
-        element: <CreateRfpPage />,
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <CreateRfpPage />
+          </Suspense>
+        ),
         errorElement: <ErrorPage />,
       },
       {
         path: "rfps/:id",
-        element: <RfpDetailPage />,
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <RfpDetailPage />
+          </Suspense>
+        ),
         errorElement: <ErrorPage />,
       },
       {
         path: "admin/users",
-        element: <UserManagement />,
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <UserManagement />
+          </Suspense>
+        ),
         errorElement: <ErrorPage />,
       },
       {
         path: "admin/users/:id",
-        element: <UserDetailView />,
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <UserDetailView />
+          </Suspense>
+        ),
         errorElement: <ErrorPage />,
       },
       {
@@ -137,7 +168,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "profile",
-        element: <ProfilePage />,
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <ProfilePage />
+          </Suspense>
+        ),
         errorElement: <ErrorPage />,
       },
       {

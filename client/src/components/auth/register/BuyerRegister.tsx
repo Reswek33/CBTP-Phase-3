@@ -64,14 +64,13 @@ const BuyerRegister: React.FC = () => {
     setLoading(true);
     setServerError(null);
     try {
-      console.log(data);
       const { confirmPassword, ...apiData } = data;
       console.log(confirmPassword);
-      await postRegister(apiData);
+      const res = await postRegister(apiData);
       setSubmitted(true);
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 2000);
+      if (res.success) {
+        navigate(`/verify-otp?email=${data.email}`);
+      }
     } catch (err: any) {
       setServerError(
         err.response?.data?.message || "Registration failed. Please try again.",

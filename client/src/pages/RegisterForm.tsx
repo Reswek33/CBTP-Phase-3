@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate, Link } from "react-router-dom";
 import { postRegister } from "../services/api/auth-api";
+import { CompactLissajousLoader } from "@/components/ui/LissajousDrift";
 
 const registerInputSchema = z
   .object({
@@ -173,7 +174,7 @@ export const RegisterForm: React.FC = () => {
           )}
 
           <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? "COMMITTING_DATA..." : "EXECUTE_REGISTRATION"}
+            {loading ? <CompactLissajousLoader size={24} /> : "Submit"}
           </button>
         </form>
 
