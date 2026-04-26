@@ -9,7 +9,6 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { postOtp, resendOtp } from "@/services/api/auth-api";
-import { useAuth } from "@/contexts/AuthContext";
 import { CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
 
 interface VerifyOtpProps {
@@ -23,7 +22,6 @@ export const VerifyOtp: React.FC<VerifyOtpProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,12 +74,6 @@ export const VerifyOtp: React.FC<VerifyOtpProps> = ({
 
       if (response.success) {
         setSuccess("Email verified successfully! Redirecting...");
-
-        // Auto-login after verification
-        await login({
-          identifier: email,
-          password: (location.state as any)?.tempPassword,
-        });
 
         setTimeout(() => {
           if (onSuccess) {

@@ -32,6 +32,11 @@ import {
   Lock,
   Unlock,
   Download,
+  DollarSign,
+  TrendingUp,
+  Package,
+  Hash,
+  Tag,
 } from "lucide-react";
 
 interface Document {
@@ -52,13 +57,31 @@ interface ActivityLog {
 
 interface Bid {
   id: string;
-  amount: string;
+  amount: string | null;
   proposal: string;
   status: string;
   createdAt: string;
+  rejectionReason?: string;
   rfp?: {
     title: string;
     status: string;
+  };
+}
+
+interface RFP {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  budget: string;
+  currency: string;
+  deadline: string;
+  priority: string;
+  status: string;
+  awardedBidId?: string;
+  createdAt: string;
+  _count?: {
+    bids: number;
   };
 }
 
@@ -71,6 +94,7 @@ interface UserDetail {
   role: string;
   isActive: boolean;
   createdAt: string;
+  updatedAt: string;
   supplier?: {
     businessName: string;
     phone: string;
@@ -99,19 +123,17 @@ interface UserDetail {
     verifiedAt?: string;
     rejectedReason?: string;
     documents: Document[];
-    rfps: any[];
+    rfps: RFP[];
   };
   activityLogs: ActivityLog[];
 }
 
 const getFileUrl = (filePath: string): string => {
   if (!filePath) return "";
-
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
     return filePath;
   }
-
-  const apiUrl = "http://localhost:5000";
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
   return `${apiUrl}/${filePath}`;
 };
 
@@ -124,14 +146,12 @@ const DocumentViewerModal: React.FC<{
   if (!isOpen || !document) return null;
 
   const fileUrl = getFileUrl(document.filePath);
-  console.log("fileUrl", fileUrl);
   const isImage = document.fileName.match(/\.(jpg|jpeg|png|gif|webp)$/i);
   const isPDF = document.fileName.match(/\.pdf$/i);
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
       <div className="bg-card border border-border rounded-2xl w-full max-w-4xl max-h-[90vh] mx-4 flex flex-col shadow-2xl animate-scale-in">
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div>
             <h3 className="text-lg font-bold text-foreground">
@@ -150,7 +170,6 @@ const DocumentViewerModal: React.FC<{
           </button>
         </div>
 
-        {/* Document Preview */}
         <div className="flex-1 overflow-auto p-4 bg-muted/20">
           {isImage ? (
             <img
@@ -182,7 +201,6 @@ const DocumentViewerModal: React.FC<{
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between p-4 border-t border-border">
           <div className="text-xs text-muted-foreground">
             {document.verifiedAt ? (
@@ -362,7 +380,7 @@ export const UserDetailView = () => {
   const [data, setData] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "documents" | "activity"
+    "overview" | "documents" | "activity" | "rfps" | "bids"
   >("overview");
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(
     null,
@@ -380,6 +398,7 @@ export const UserDetailView = () => {
     if (id) {
       try {
         const res = await getUserDetails(id);
+        console.log(res.user);
         setData(res.user);
       } catch (err) {
         console.error("Error loading details", err);
@@ -488,6 +507,36 @@ export const UserDetailView = () => {
     }
   };
 
+  const getBidStatusBadge = (status: string) => {
+    switch (status) {
+      case "AWARDED":
+        return "bg-green-500/10 text-green-500 border-green-500/20";
+      case "REJECTED":
+        return "bg-destructive/10 text-destructive border-destructive/20";
+      case "PENDING_APPROVAL":
+        return "bg-amber-500/10 text-amber-500 border-amber-500/20";
+      case "ACTIVE":
+        return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+      default:
+        return "bg-muted text-muted-foreground border-border";
+    }
+  };
+
+  const getRfpStatusBadge = (status: string) => {
+    switch (status) {
+      case "OPEN":
+        return "bg-green-500/10 text-green-500 border-green-500/20";
+      case "AWARDED":
+        return "bg-purple-500/10 text-purple-500 border-purple-500/20";
+      case "CLOSED":
+        return "bg-slate-500/10 text-slate-500 border-slate-500/20";
+      case "CANCELLED":
+        return "bg-destructive/10 text-destructive border-destructive/20";
+      default:
+        return "bg-muted text-muted-foreground border-border";
+    }
+  };
+
   const handleViewDocument = (doc: Document) => {
     setSelectedDocument(doc);
     setShowDocumentViewer(true);
@@ -529,6 +578,10 @@ export const UserDetailView = () => {
     ? data.supplier?.documents
     : data.buyer?.documents;
 
+  const hasBids =
+    isSupplier && data.supplier?.bids && data.supplier.bids.length > 0;
+  const hasRfps = isBuyer && data.buyer?.rfps && data.buyer.rfps.length > 0;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -543,7 +596,6 @@ export const UserDetailView = () => {
           </button>
 
           <div className="flex items-center gap-3">
-            {/* Block/Unblock Button */}
             <button
               onClick={() => setShowBlockModal(true)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
@@ -597,6 +649,12 @@ export const UserDetailView = () => {
                 @{data.username}
               </p>
             </div>
+            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+              <span>ID: {data.id.slice(0, 8)}...</span>
+              <span>
+                Joined: {new Date(data.createdAt).toLocaleDateString()}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -636,7 +694,7 @@ export const UserDetailView = () => {
 
       {/* Tabs */}
       <div className="border-b border-border">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setActiveTab("overview")}
             className={`px-4 py-2 text-sm font-medium transition-colors relative ${
@@ -670,6 +728,42 @@ export const UserDetailView = () => {
               )}
             </button>
           )}
+          {isSupplier && hasBids && (
+            <button
+              onClick={() => setActiveTab("bids")}
+              className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                activeTab === "bids"
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Bids
+              <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold bg-primary/20 text-primary rounded-full">
+                {data.supplier?.bids.length}
+              </span>
+              {activeTab === "bids" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"></div>
+              )}
+            </button>
+          )}
+          {isBuyer && hasRfps && (
+            <button
+              onClick={() => setActiveTab("rfps")}
+              className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                activeTab === "rfps"
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              RFPs
+              <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold bg-primary/20 text-primary rounded-full">
+                {data.buyer?.rfps.length}
+              </span>
+              {activeTab === "rfps" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"></div>
+              )}
+            </button>
+          )}
           <button
             onClick={() => setActiveTab("activity")}
             className={`px-4 py-2 text-sm font-medium transition-colors relative ${
@@ -692,7 +786,6 @@ export const UserDetailView = () => {
         <div className="lg:col-span-2 space-y-6">
           {activeTab === "overview" && (
             <>
-              {/* Personal & Business Info */}
               <div className="bg-card border border-border rounded-xl p-6">
                 <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
                   <Building2 className="w-5 h-5 text-primary" />
@@ -712,7 +805,7 @@ export const UserDetailView = () => {
                         value={data.supplier?.businessType}
                       />
                       <InfoRow
-                        icon={FileText}
+                        icon={Hash}
                         label="Tax ID"
                         value={data.supplier?.taxId}
                       />
@@ -750,7 +843,7 @@ export const UserDetailView = () => {
                         value={data.buyer?.companyType}
                       />
                       <InfoRow
-                        icon={FileText}
+                        icon={Hash}
                         label="Tax ID"
                         value={data.buyer?.taxId}
                       />
@@ -779,7 +872,6 @@ export const UserDetailView = () => {
                 </div>
               </div>
 
-              {/* Bio / Description */}
               {isSupplier && data.supplier?.bio && (
                 <div className="bg-card border border-border rounded-xl p-6">
                   <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
@@ -789,82 +881,6 @@ export const UserDetailView = () => {
                   <p className="text-muted-foreground leading-relaxed">
                     {data.supplier.bio}
                   </p>
-                </div>
-              )}
-
-              {/* Bids (Suppliers) */}
-              {isSupplier &&
-                data.supplier?.bids &&
-                data.supplier.bids.length > 0 && (
-                  <div className="bg-card border border-border rounded-xl p-6">
-                    <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                      <Target className="w-5 h-5 text-primary" />
-                      Recent Bids
-                    </h3>
-                    <div className="space-y-3">
-                      {data.supplier.bids.slice(0, 5).map((bid) => (
-                        <div
-                          key={bid.id}
-                          className="p-3 rounded-lg bg-muted/30"
-                        >
-                          <div className="flex items-center justify-between flex-wrap gap-2">
-                            <div>
-                              <p className="font-medium text-foreground">
-                                {bid.rfp?.title || "Untitled RFP"}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Bid Amount: ${bid.amount}
-                              </p>
-                            </div>
-                            <div
-                              className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                                bid.status === "AWARDED"
-                                  ? "bg-green-500/10 text-green-500"
-                                  : "bg-amber-500/10 text-amber-500"
-                              }`}
-                            >
-                              {bid.status}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              {/* RFPs (Buyers) */}
-              {isBuyer && data.buyer?.rfps && data.buyer.rfps.length > 0 && (
-                <div className="bg-card border border-border rounded-xl p-6">
-                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-primary" />
-                    Recent RFPs
-                  </h3>
-                  <div className="space-y-3">
-                    {data.buyer.rfps.slice(0, 5).map((rfp: any) => (
-                      <div key={rfp.id} className="p-3 rounded-lg bg-muted/30">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div>
-                            <p className="font-medium text-foreground">
-                              {rfp.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Budget: ${rfp.budget} • Deadline:{" "}
-                              {new Date(rfp.deadline).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div
-                            className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                              rfp.status === "OPEN"
-                                ? "bg-green-500/10 text-green-500"
-                                : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {rfp.status}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
             </>
@@ -895,7 +911,7 @@ export const UserDetailView = () => {
                           </p>
                           {doc.verifiedAt && (
                             <p className="text-xs text-green-500">
-                              ✓ Verified on{" "}
+                              ✓ Verified by Admin on{" "}
                               {new Date(doc.verifiedAt).toLocaleDateString()}
                             </p>
                           )}
@@ -916,6 +932,135 @@ export const UserDetailView = () => {
                   No documents uploaded
                 </p>
               )}
+            </div>
+          )}
+
+          {activeTab === "bids" && isSupplier && data.supplier?.bids && (
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                <Target className="w-5 h-5 text-primary" />
+                Bid History
+              </h3>
+              <div className="space-y-4">
+                {data.supplier.bids.map((bid) => (
+                  <div
+                    key={bid.id}
+                    className="p-4 rounded-lg bg-muted/30 border border-border hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-start justify-between flex-wrap gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-semibold text-foreground">
+                            {bid.rfp?.title || "Untitled RFP"}
+                          </h4>
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium border ${getBidStatusBadge(bid.status)}`}
+                          >
+                            {bid.status.replace("_", " ")}
+                          </span>
+                        </div>
+                        {bid.proposal && (
+                          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                            {bid.proposal}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                          {bid.amount && (
+                            <span className="flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" />
+                              Amount: {bid.amount}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            Submitted:{" "}
+                            {new Date(bid.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        {bid.rejectionReason && (
+                          <div className="mt-2 p-2 rounded bg-destructive/10 text-destructive text-xs">
+                            Rejection reason: {bid.rejectionReason}
+                          </div>
+                        )}
+                      </div>
+                      {bid.rfp?.status && (
+                        <div
+                          className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${getRfpStatusBadge(bid.rfp.status)}`}
+                        >
+                          RFP: {bid.rfp.status}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "rfps" && isBuyer && data.buyer?.rfps && (
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                <Package className="w-5 h-5 text-primary" />
+                Request for Proposals (RFPs)
+              </h3>
+              <div className="space-y-4">
+                {data.buyer.rfps.map((rfp) => (
+                  <div
+                    key={rfp.id}
+                    className="p-4 rounded-lg bg-muted/30 border border-border hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-start justify-between flex-wrap gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <h4 className="font-semibold text-foreground">
+                            {rfp.title}
+                          </h4>
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium border ${getRfpStatusBadge(rfp.status)}`}
+                          >
+                            {rfp.status}
+                          </span>
+                          {rfp.priority === "URGENT" && (
+                            <span className="inline-flex px-2 py-0.5 rounded-lg text-xs font-medium border bg-destructive/10 text-destructive border-destructive/20">
+                              Urgent
+                            </span>
+                          )}
+                        </div>
+                        {rfp.description && (
+                          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                            {rfp.description}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <DollarSign className="w-3 h-3" />
+                            Budget: {rfp.currency}{" "}
+                            {parseInt(rfp.budget).toLocaleString()}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            Deadline:{" "}
+                            {new Date(rfp.deadline).toLocaleDateString()}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" />
+                            Bids: {rfp._count?.bids || 0}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Tag className="w-3 h-3" />
+                            Category: {rfp.category}
+                          </span>
+                        </div>
+                        {rfp.awardedBidId && (
+                          <div className="mt-2 p-2 rounded bg-green-500/10 text-green-600 dark:text-green-400 text-xs">
+                            ✓ Contract awarded
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -942,6 +1087,11 @@ export const UserDetailView = () => {
                     </div>
                   </div>
                 ))}
+                {(!data.activityLogs || data.activityLogs.length === 0) && (
+                  <p className="text-center text-muted-foreground py-8">
+                    No activity logs found
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -949,7 +1099,6 @@ export const UserDetailView = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Account Info */}
           <div className="bg-card border border-border rounded-xl p-6">
             <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
               <Shield className="w-5 h-5 text-primary" />
@@ -970,10 +1119,14 @@ export const UserDetailView = () => {
                   data.isActive ? "text-green-500" : "text-destructive"
                 }
               />
+              <InfoRow
+                icon={Clock}
+                label="Last Updated"
+                value={new Date(data.updatedAt).toLocaleDateString()}
+              />
             </div>
           </div>
 
-          {/* Verification Info */}
           {(isSupplier && data.supplier?.verifiedAt) ||
           (isBuyer && data.buyer?.verifiedAt) ? (
             <div className="bg-card border border-border rounded-xl p-6">
@@ -1009,7 +1162,6 @@ export const UserDetailView = () => {
             </div>
           ) : null}
 
-          {/* Stats */}
           <div className="bg-card border border-border rounded-xl p-6">
             <h3 className="text-lg font-bold text-foreground mb-4">
               Statistics
@@ -1051,12 +1203,35 @@ export const UserDetailView = () => {
                   </span>
                 </div>
               )}
+              {isSupplier && data.supplier?.bids && (
+                <div className="flex justify-between items-center p-2 rounded-lg bg-muted/30">
+                  <span className="text-sm text-muted-foreground">
+                    Won Bids
+                  </span>
+                  <span className="text-lg font-bold text-green-500">
+                    {
+                      data.supplier.bids.filter((b) => b.status === "AWARDED")
+                        .length
+                    }
+                  </span>
+                </div>
+              )}
+              {isBuyer && data.buyer?.rfps && (
+                <div className="flex justify-between items-center p-2 rounded-lg bg-muted/30">
+                  <span className="text-sm text-muted-foreground">
+                    Active RFPs
+                  </span>
+                  <span className="text-lg font-bold text-blue-500">
+                    {data.buyer.rfps.filter((r) => r.status === "OPEN").length}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Document Viewer Modal */}
+      {/* Modals */}
       <DocumentViewerModal
         isOpen={showDocumentViewer}
         document={selectedDocument}
@@ -1066,7 +1241,6 @@ export const UserDetailView = () => {
         }}
       />
 
-      {/* Confirmation Modal for Approval */}
       <ConfirmationModal
         isOpen={showConfirmModal}
         title="Approve User"
@@ -1079,7 +1253,6 @@ export const UserDetailView = () => {
         isSubmitting={isSubmitting}
       />
 
-      {/* Confirmation Modal for Block/Unblock */}
       <ConfirmationModal
         isOpen={showBlockModal}
         title={data.isActive ? "Block User" : "Unblock User"}
@@ -1096,7 +1269,6 @@ export const UserDetailView = () => {
         isSubmitting={isSubmitting}
       />
 
-      {/* Rejection Modal */}
       <RejectionModal
         isOpen={showRejectModal}
         reason={reason}
@@ -1129,6 +1301,12 @@ export const UserDetailView = () => {
         }
         .animate-scale-in {
           animation: scale-in 0.2s ease-out;
+        }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
       `}</style>
     </div>

@@ -31,14 +31,13 @@ import {
   Briefcase,
   Users,
   X,
+  RefreshCw,
 } from "lucide-react";
 
 // Helper function to get file URL (relative path)
 const getFileUrl = (filePath: string) => {
   if (!filePath) return "";
-  // Remove leading slash if present to avoid double slashes
   const cleanPath = filePath.startsWith("/") ? filePath.slice(1) : filePath;
-  // Use relative URL - the proxy or API base URL will handle it
   return `/${cleanPath}`;
 };
 
@@ -57,7 +56,6 @@ const DocumentViewerModal: React.FC<{
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
       <div className="bg-card border border-border rounded-2xl w-full max-w-4xl max-h-[90vh] mx-4 flex flex-col shadow-2xl animate-scale-in">
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div>
             <h3 className="text-lg font-bold text-foreground">
@@ -75,7 +73,6 @@ const DocumentViewerModal: React.FC<{
           </button>
         </div>
 
-        {/* Document Preview */}
         <div className="flex-1 overflow-auto p-4 bg-muted/20">
           {isImage ? (
             <img
@@ -113,7 +110,6 @@ const DocumentViewerModal: React.FC<{
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between p-4 border-t border-border">
           <div className="text-xs text-muted-foreground">
             Uploaded as part of RFP documentation
@@ -134,6 +130,130 @@ const DocumentViewerModal: React.FC<{
   );
 };
 
+// Reapply Modal Component
+const ReapplyModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (proposalText: string, file: File | null) => Promise<void>;
+  submitting: boolean;
+}> = ({ isOpen, onClose, onSubmit, submitting }) => {
+  const [proposalText, setProposalText] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) {
+      alert("Please upload a proposal PDF");
+      return;
+    }
+    await onSubmit(proposalText, selectedFile);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl mx-4 shadow-2xl animate-scale-in">
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h3 className="text-lg font-bold text-foreground">Reapply to RFP</h3>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-muted rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-mono text-muted-foreground mb-2">
+              Technical Proposal Summary
+            </label>
+            <textarea
+              placeholder="Outline your technical approach, methodology, and qualifications..."
+              rows={5}
+              value={proposalText}
+              onChange={(e) => setProposalText(e.target.value)}
+              className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono text-muted-foreground mb-2">
+              Proposal Document (PDF)
+            </label>
+            <div className="relative border-2 border-dashed border-border rounded-lg p-6 text-center">
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                required
+              />
+              {!selectedFile ? (
+                <div>
+                  <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Click to upload or drag and drop
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    PDF only (Max 10MB)
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-3 bg-background rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <File className="w-5 h-5 text-primary" />
+                    <span className="text-sm text-foreground">
+                      {selectedFile.name}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFile(null)}
+                    className="p-1 hover:bg-muted rounded"
+                  >
+                    <XCircle className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-border rounded-lg text-foreground hover:bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {submitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Submit Reapplication
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
   const { user } = useAuth();
   const socket = useSocket();
@@ -147,18 +267,17 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
     filePath: string;
   } | null>(null);
   const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+  const [showReapplyModal, setShowReapplyModal] = useState(false);
 
   // Form States
   const [proposalText, setProposalText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [financialAmount, setFinancialAmount] = useState<number>(0);
 
-  // 1. Initial Data Fetch
   const fetchData = async () => {
     try {
       setLoading(true);
       const response = await getRfpsById(rfpId);
-      console.log(response);
       const rfpData = response.data;
       setRfp(rfpData);
 
@@ -177,7 +296,6 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
     fetchData();
   }, [rfpId]);
 
-  // 2. Socket Lifecycle
   useEffect(() => {
     if (!socket) return;
     socket.emit("join_rfp", rfpId);
@@ -192,7 +310,6 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
     };
   }, [socket, rfpId]);
 
-  // --- ACTIONS ---
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) {
@@ -211,6 +328,28 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
       setSelectedFile(null);
     } catch (err: any) {
       alert(err.response?.data?.message || "Application failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReapply = async (
+    newProposalText: string,
+    newFile: File | null,
+  ) => {
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append("proposal", newProposalText);
+      if (newFile) {
+        formData.append("proposalFile", newFile);
+      }
+      const res = await applyToBid(rfpId, formData);
+      console.log(res.data);
+      alert("Reapplication submitted successfully!");
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Reapplication failed");
     } finally {
       setSubmitting(false);
     }
@@ -345,14 +484,14 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
   const canApply = isSupplier && !userBid && rfp.status === "OPEN";
   const isPending = userBid?.status === "PENDING_APPROVAL";
   const isApproved = userBid?.status === "ACTIVE";
+  const isRejected = userBid?.status === "REJECTED";
   const rfpStatusConfig = getStatusConfig(rfp.status);
   const hasDocuments = rfp.documents && rfp.documents.length > 0;
 
   return (
     <div className="space-y-6">
-      {/* Main Card */}
+      {/* Main Info Card */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
-        {/* Header */}
         <div className="border-b border-border bg-muted/30 p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex-1">
@@ -372,20 +511,14 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                     <span>URGENT</span>
                   </div>
                 )}
-                {rfp.priority === "HIGH" && (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-orange-500/10 text-orange-500 border border-orange-500/20">
-                    <AlertCircle className="w-3 h-3" />
-                    <span>HIGH PRIORITY</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Details Grid */}
+        {/* Two-Column Details Grid */}
         <div className="p-6 border-b border-border">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
               <Tag className="w-4 h-4 text-primary" />
               <div>
@@ -442,15 +575,15 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
           </p>
         </div>
 
-        {/* RFP Documents Section */}
+        {/* Documents Section - Grid Cards */}
         {hasDocuments && (
           <div className="p-6 border-b border-border">
             <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
               <File className="w-5 h-5 text-primary" />
               Tender Documents ({rfp.documents.length})
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {rfp.documents.map((doc: any, index: number) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {rfp.documents.map((doc: any) => (
                 <div
                   key={doc.id}
                   className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group cursor-pointer"
@@ -459,11 +592,8 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                   <div className="flex items-center gap-3">
                     <FileText className="w-5 h-5 text-primary" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate max-w-[180px]">
+                      <p className="text-sm font-medium text-foreground truncate max-w-[200px]">
                         {doc.fileName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Document {index + 1}
                       </p>
                     </div>
                   </div>
@@ -477,14 +607,14 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
           </div>
         )}
 
-        {/* Supplier Interface */}
+        {/* Supplier Action Cards */}
         {isSupplier && rfp.status === "OPEN" && (
           <div className="p-6">
             {canApply && (
               <div className="bg-muted/30 rounded-xl p-6 border border-border">
                 <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-primary" />
-                  Step 1: Request to Bid
+                  Request to Bid
                 </h3>
                 <form onSubmit={handleApply} className="space-y-4">
                   <div>
@@ -492,11 +622,11 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                       Technical Proposal Summary
                     </label>
                     <textarea
-                      placeholder="Outline your technical approach, methodology, and qualifications..."
-                      rows={5}
+                      placeholder="Outline your technical approach..."
+                      rows={4}
                       value={proposalText}
                       onChange={(e) => setProposalText(e.target.value)}
-                      className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                      className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       required
                     />
                   </div>
@@ -504,7 +634,7 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                     <label className="block text-xs font-mono text-muted-foreground mb-2">
                       Proposal Document (PDF)
                     </label>
-                    <div className="relative border-2 border-dashed border-border rounded-lg p-6 text-center">
+                    <div className="relative border-2 border-dashed border-border rounded-lg p-4 text-center">
                       <input
                         type="file"
                         accept=".pdf"
@@ -516,26 +646,19 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                       />
                       {!selectedFile ? (
                         <div>
-                          <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                          <p className="text-sm text-muted-foreground">
-                            Click to upload or drag and drop
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            PDF only (Max 10MB)
+                          <Upload className="w-6 h-6 text-muted-foreground mx-auto mb-1" />
+                          <p className="text-xs text-muted-foreground">
+                            Click to upload PDF
                           </p>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between p-3 bg-background rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <File className="w-5 h-5 text-primary" />
-                            <span className="text-sm text-foreground">
-                              {selectedFile.name}
-                            </span>
-                          </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-foreground">
+                            {selectedFile.name}
+                          </span>
                           <button
                             type="button"
                             onClick={() => setSelectedFile(null)}
-                            className="p-1 hover:bg-muted rounded"
                           >
                             <XCircle className="w-4 h-4 text-muted-foreground" />
                           </button>
@@ -546,17 +669,13 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {submitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Submitting...
-                      </>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <>
-                        <Send className="w-4 h-4" />
-                        Submit Application
+                        <Send className="w-4 h-4" /> Submit Application
                       </>
                     )}
                   </button>
@@ -573,10 +692,35 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                       Pending Review
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      Your technical proposal is being reviewed by the buyer.
-                      You will be notified once a decision is made.
+                      Your proposal is being reviewed by the buyer.
                     </p>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {isRejected && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <XCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-destructive mb-1">
+                        Application Rejected
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        {userBid?.rejectionReason ||
+                          "Your application did not meet the requirements."}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowReapplyModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Reapply
+                  </button>
                 </div>
               </div>
             )}
@@ -585,7 +729,7 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
               <div className="bg-muted/30 rounded-xl p-6 border border-border">
                 <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
                   <DollarSign className="w-5 h-5 text-primary" />
-                  Step 2: Submit Financial Bid
+                  Submit Financial Bid
                 </h3>
                 <form onSubmit={handleFinancialSubmit} className="space-y-4">
                   <div>
@@ -600,24 +744,20 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                       onChange={(e) =>
                         setFinancialAmount(Number(e.target.value))
                       }
-                      className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       required
                     />
                   </div>
                   <button
                     type="submit"
                     disabled={submitting || !financialAmount}
-                    className="w-full px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {submitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Submitting...
-                      </>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <>
-                        <DollarSign className="w-4 h-4" />
-                        Submit Financial Bid
+                        <DollarSign className="w-4 h-4" /> Submit Financial Bid
                       </>
                     )}
                   </button>
@@ -628,43 +768,39 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
         )}
       </div>
 
-      {/* Buyer Management Interface */}
+      {/* Buyer Management - Supplier Cards Grid */}
       {isBuyer && rfp.bids && rfp.bids.length > 0 && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="border-b border-border bg-muted/30 p-6">
-            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary" />
-              Supplier Applications ({rfp.bids.length})
-            </h2>
-          </div>
-          <div className="divide-y divide-border">
+        <div>
+          <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" />
+            Supplier Applications ({rfp.bids.length})
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {rfp.bids.map((bid: any) => {
               const bidStatusConfig = getStatusConfig(bid.status);
               return (
                 <div
                   key={bid.id}
-                  className="p-6 hover:bg-muted/30 transition-colors"
+                  className="bg-card border border-border rounded-xl p-5 hover:shadow-lg transition-all"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                  <div className="flex items-start justify-between mb-3">
                     <div>
                       <h3 className="text-lg font-semibold text-foreground">
                         {bid.supplier?.businessName || "Unknown Supplier"}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div
-                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium border ${bidStatusConfig.bg} ${bidStatusConfig.text} ${bidStatusConfig.border}`}
-                        >
-                          {bidStatusConfig.icon}
-                          <span>{bidStatusConfig.label}</span>
-                        </div>
+                      <div
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium border mt-2 ${bidStatusConfig.bg} ${bidStatusConfig.text} ${bidStatusConfig.border}`}
+                      >
+                        {bidStatusConfig.icon}
+                        <span>{bidStatusConfig.label}</span>
                       </div>
                     </div>
                     {bid.amount && (
                       <div className="text-right">
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           Bid Amount
                         </p>
-                        <p className="text-xl font-bold text-green-500">
+                        <p className="text-lg font-bold text-green-500">
                           {rfp.currency || "ETB"} {bid.amount.toLocaleString()}
                         </p>
                       </div>
@@ -672,35 +808,33 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                   </div>
 
                   {bid.proposal && (
-                    <div className="mb-4 p-3 rounded-lg bg-muted/30">
-                      <p className="text-sm text-muted-foreground">
+                    <div className="mb-3 p-3 rounded-lg bg-muted/30">
+                      <p className="text-sm text-muted-foreground line-clamp-3">
                         {bid.proposal}
                       </p>
                     </div>
                   )}
 
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
+                    <div className="flex flex-wrap gap-2">
                       {bid.proposalPath && (
                         <>
                           <button
                             onClick={() => {
                               const url = getFileUrl(bid.proposalPath);
-                              window.open(url, "_blank", "noopener,noreferrer");
+                              window.open(url, "_blank");
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary hover:text-primary/80"
                           >
-                            <Eye className="w-4 h-4" />
-                            View Proposal
+                            <Eye className="w-3 h-3" />
+                            View
                           </button>
                           <a
                             href={getFileUrl(bid.proposalPath)}
                             download
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                           >
-                            <Download className="w-4 h-4" />
+                            <Download className="w-3 h-3" />
                             Download
                           </a>
                         </>
@@ -712,18 +846,18 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                         <>
                           <button
                             onClick={() => handleStatusUpdate(bid.id, "ACTIVE")}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-medium hover:bg-green-600"
                           >
-                            <UserCheck className="w-4 h-4" />
+                            <UserCheck className="w-3 h-3" />
                             Approve
                           </button>
                           <button
                             onClick={() =>
                               handleStatusUpdate(bid.id, "REJECTED")
                             }
-                            className="flex items-center gap-2 px-3 py-1.5 bg-destructive text-white rounded-lg text-sm font-medium hover:bg-destructive/90 transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-destructive text-white rounded-lg text-xs font-medium hover:bg-destructive/90"
                           >
-                            <UserX className="w-4 h-4" />
+                            <UserX className="w-3 h-3" />
                             Reject
                           </button>
                         </>
@@ -731,21 +865,18 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                       {bid.status === "ACTIVE" && rfp.status === "OPEN" && (
                         <button
                           onClick={() => handleAwardContract(bid.id)}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors"
+                          className="flex items-center gap-1 px-3 py-1.5 bg-purple-500 text-white rounded-lg text-xs font-medium hover:bg-purple-600"
                         >
-                          <Award className="w-4 h-4" />
-                          Award Contract
+                          <Award className="w-3 h-3" />
+                          Award
                         </button>
                       )}
                     </div>
                   </div>
 
                   {bid.rejectionReason && bid.status === "REJECTED" && (
-                    <div className="mt-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                      <p className="text-xs font-mono text-destructive mb-1">
-                        Rejection Reason
-                      </p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="mt-3 p-2 rounded-lg bg-destructive/10">
+                      <p className="text-xs text-destructive">
                         {bid.rejectionReason}
                       </p>
                     </div>
@@ -762,13 +893,10 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
         <div className="bg-card border border-border rounded-xl p-12 text-center">
           <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">No applications yet.</p>
-          <p className="text-xs text-muted-foreground mt-2">
-            Suppliers will be able to submit proposals once they apply.
-          </p>
         </div>
       )}
 
-      {/* Document Viewer Modal */}
+      {/* Modals */}
       <DocumentViewerModal
         isOpen={showDocumentViewer}
         document={selectedDocument}
@@ -778,14 +906,17 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
         }}
       />
 
+      <ReapplyModal
+        isOpen={showReapplyModal}
+        onClose={() => setShowReapplyModal(false)}
+        onSubmit={handleReapply}
+        submitting={submitting}
+      />
+
       <style>{`
         @keyframes fade-in {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         @keyframes scale-in {
           from {
@@ -802,6 +933,12 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
         }
         .animate-scale-in {
           animation: scale-in 0.2s ease-out;
+        }
+        .line-clamp-3 {
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
       `}</style>
     </div>

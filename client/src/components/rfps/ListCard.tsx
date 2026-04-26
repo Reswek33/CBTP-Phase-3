@@ -13,12 +13,15 @@ import {
   MessageSquare,
   Eye,
   AlertCircle,
-  Clock,
   TrendingUp,
   Filter,
   Search,
   ChevronDown,
   ChevronUp,
+  Tag,
+  HelpCircle,
+  Send,
+  X,
 } from "lucide-react";
 
 type SortField = "budget" | "deadline" | "createdAt" | "bids";
@@ -32,6 +35,98 @@ interface FilterState {
   searchTerm: string;
 }
 
+// Message Modal Component
+const MessageModal: React.FC<{
+  isOpen: boolean;
+  rfp: RFPS | null;
+  onClose: () => void;
+  onSend: (message: string) => void;
+  isSending: boolean;
+}> = ({ isOpen, rfp, onClose, onSend, isSending }) => {
+  const [message, setMessage] = useState("");
+
+  if (!isOpen || !rfp) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (message.trim()) {
+      onSend(message);
+      setMessage("");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-md mx-4 shadow-2xl animate-scale-in">
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <div>
+            <h3 className="text-lg font-bold text-foreground">Contact Buyer</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              RFP: {rfp.title}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-muted rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="mb-4">
+            <label className="block text-xs font-mono text-muted-foreground mb-2">
+              Your Message
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Ask questions about the RFP, request clarification, or express interest..."
+              rows={5}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              required
+            />
+          </div>
+
+          <div className="bg-muted/30 rounded-lg p-3 mb-4">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <HelpCircle className="w-3 h-3" />
+              Tip: Be specific about your questions to get better responses
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-border rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSending || !message.trim()}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Send Message
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const ListCard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -43,6 +138,9 @@ const ListCard: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [selectedRfp, setSelectedRfp] = useState<RFPS | null>(null);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     status: [],
     priority: [],
@@ -129,13 +227,25 @@ const ListCard: React.FC = () => {
   }, [rfps, filters, sortField, sortOrder]);
 
   const handleContactBuyer = useCallback(
-    async (e: React.MouseEvent, rfp: RFPS) => {
-      e.stopPropagation();
+    async (rfp: RFPS, message?: string) => {
       try {
+        setIsSending(true);
         const chat = await getOrCreateConversation({ rfpId: rfp.id });
-        navigate(`/dashboard/chat?id=${chat.id}`);
+
+        // If there's a pre-written message, we might want to send it automatically
+        if (message) {
+          // Optionally send the initial message
+          // await sendMessage({ conversationId: chat.id, content: message });
+        }
+
+        navigate(`/dashboard/chat?conversationId=${chat.id}`);
       } catch (err) {
         console.error("Failed to initialize chat", err);
+        alert("Failed to start conversation. Please try again.");
+      } finally {
+        setIsSending(false);
+        setShowMessageModal(false);
+        setSelectedRfp(null);
       }
     },
     [navigate],
@@ -170,7 +280,7 @@ const ListCard: React.FC = () => {
       case "CLOSED":
         return "text-muted-foreground bg-muted/50 border-border";
       case "AWARDED":
-        return "text-blue-500 bg-blue-500/10 border-blue-500/20";
+        return "text-purple-500 bg-purple-500/10 border-purple-500/20";
       case "CANCELLED":
         return "text-destructive bg-destructive/10 border-destructive/20";
       default:
@@ -453,7 +563,7 @@ const ListCard: React.FC = () => {
         </p>
       </div>
 
-      {/* RFP Cards */}
+      {/* RFP Grid Cards */}
       {filteredRfps.length === 0 ? (
         <div className="bg-card border border-border rounded-xl p-12 text-center">
           <FileText className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
@@ -471,107 +581,117 @@ const ListCard: React.FC = () => {
           )}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredRfps.map((rfp) => (
             <div
               key={rfp.id}
-              onClick={() => handleCardClick(rfp.id)}
-              className="bg-card border border-border rounded-xl p-6 cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+              className="bg-card border border-border rounded-xl overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1 flex flex-col"
             >
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    {rfp.title}
-                  </h3>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Building2 className="w-4 h-4" />
-                    <span>{rfp.buyer.companyName}</span>
+              {/* Card Content */}
+              <div
+                className="p-5 flex-1 cursor-pointer"
+                onClick={() => handleCardClick(rfp.id)}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold text-foreground line-clamp-2 mb-2">
+                      {rfp.title}
+                    </h3>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Building2 className="w-3 h-3 shrink-0" />
+                      <span className="truncate">{rfp.buyer.companyName}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+
+                {/* Badges */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
                   <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border ${getPriorityColor(rfp.priority)}`}
+                    className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium border ${getPriorityColor(rfp.priority)}`}
                   >
                     {rfp.priority}
                   </span>
                   <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusColor(rfp.status)}`}
+                    className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium border ${getStatusColor(rfp.status)}`}
                   >
                     {rfp.status}
                   </span>
                 </div>
-              </div>
 
-              {/* Description */}
-              <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                {rfp.description}
-              </p>
+                {/* Description */}
+                <p className="text-muted-foreground text-xs mb-4 line-clamp-2">
+                  {rfp.description || "No description provided"}
+                </p>
 
-              {/* Details Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 pb-4 border-b border-border">
-                <div>
-                  <p className="text-xs font-mono text-muted-foreground mb-1">
-                    BUDGET
-                  </p>
-                  <p className="text-lg font-bold text-foreground">
-                    ${rfp.budget.toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-mono text-muted-foreground mb-1">
-                    DEADLINE
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-sm text-foreground">
-                      {new Date(rfp.deadline).toLocaleDateString()}
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <p className="text-[10px] font-mono text-muted-foreground mb-0.5">
+                      BUDGET
                     </p>
+                    <div className="flex items-center gap-1">
+                      <DollarSign className="w-3 h-3 text-muted-foreground" />
+                      <p className="text-sm font-semibold text-foreground">
+                        {rfp.budget.toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <p className="text-xs font-mono text-muted-foreground mb-1">
-                    BIDS
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-sm text-foreground">
-                      {rfp._count?.bids || 0}
+                  <div>
+                    <p className="text-[10px] font-mono text-muted-foreground mb-0.5">
+                      DEADLINE
                     </p>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-muted-foreground" />
+                      <p className="text-xs text-foreground">
+                        {new Date(rfp.deadline).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <p className="text-xs font-mono text-muted-foreground mb-1">
-                    POSTED
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-sm text-foreground">
-                      {new Date(rfp.createdAt).toLocaleDateString()}
+                  <div>
+                    <p className="text-[10px] font-mono text-muted-foreground mb-0.5">
+                      BIDS
                     </p>
+                    <div className="flex items-center gap-1">
+                      <Users className="w-3 h-3 text-muted-foreground" />
+                      <p className="text-xs text-foreground">
+                        {rfp._count?.bids || 0}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-mono text-muted-foreground mb-0.5">
+                      CATEGORY
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-muted-foreground" />
+                      <p className="text-xs text-foreground truncate">
+                        {rfp.category || "General"}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3">
+              <div className="p-4 pt-0 flex gap-2 border-t border-border mt-auto">
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCardClick(rfp.id);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  onClick={() => handleCardClick(rfp.id)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-sm"
                 >
-                  <Eye className="w-4 h-4" />
-                  <span className="text-sm font-medium">View Details</span>
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>View</span>
                 </button>
                 {isSupplier && rfp.status === "OPEN" && (
                   <button
-                    onClick={(e) => handleContactBuyer(e, rfp)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                    onClick={() => {
+                      setSelectedRfp(rfp);
+                      setShowMessageModal(true);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
                   >
-                    <MessageSquare className="w-4 h-4" />
-                    <span className="text-sm font-medium">Contact Buyer</span>
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Contact</span>
                   </button>
                 )}
               </div>
@@ -579,6 +699,51 @@ const ListCard: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Message Modal */}
+      <MessageModal
+        isOpen={showMessageModal}
+        rfp={selectedRfp}
+        onClose={() => {
+          setShowMessageModal(false);
+          setSelectedRfp(null);
+        }}
+        onSend={(message) => {
+          if (selectedRfp) {
+            handleContactBuyer(selectedRfp, message);
+          }
+        }}
+        isSending={isSending}
+      />
+
+      <style>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scale-in {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
+        }
+        .animate-scale-in {
+          animation: scale-in 0.2s ease-out;
+        }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+      `}</style>
     </div>
   );
 };

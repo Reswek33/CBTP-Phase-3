@@ -35,6 +35,7 @@ const BidHistory: React.FC = () => {
       setLoading(true);
       setError(null);
       const response = await getMyBids();
+      console.log("response: ", response);
 
       // Validate response with Zod
       const validatedResponse = bidsResponseSchema.parse(response);

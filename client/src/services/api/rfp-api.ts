@@ -11,6 +11,7 @@ export const createRfps = async (data: FormData) => {
       "Content-Type": "multipart/form-data",
     },
   });
+  console.log(response.data);
   return response.data;
 };
 

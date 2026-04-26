@@ -28,6 +28,7 @@ export const ResourceLedger: React.FC<ResourceLedgerProps> = ({ user }) => {
     setLoadingRfps(true);
     try {
       const res = await getMyRfps();
+      console.log(res);
       setRfps(res.data);
     } catch (err) {
       console.error("RFP_FETCH_ERROR", err);
