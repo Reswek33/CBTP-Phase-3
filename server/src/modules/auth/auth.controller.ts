@@ -14,6 +14,8 @@ import type { AuthenticatedRequest } from "../../shared/middleware/authMiddlewar
 import { getIO } from "../../config/socket.js";
 import { sendNotification } from "../../shared/utils/notification.js";
 import { v4 as uuid } from "uuid";
+import crypto from "crypto";
+import { sendVerificationEmail } from "../../shared/utils/mail.js";
 
 const saltRound = Number(process.env.SALT_ROUNDS) || 10;
 type TransactionClient = Prisma.TransactionClient;
@@ -51,6 +53,7 @@ export const authController = {
       // 3. Hash Password
       const hashedPassword = await bcrypt.hash(data.password, saltRound);
       const regNumber = `SUP-${uuid()}/${new Date().getFullYear()}`;
+      const otp = crypto.randomInt(100000, 999999).toString();
 
       // 4. Atomic Transaction: Create User + Profile
       const newUser = await prisma.$transaction(
@@ -63,6 +66,16 @@ export const authController = {
               email: data.email,
               passwordHash: hashedPassword,
               role: data.role,
+              isActive: false,
+            },
+          });
+
+          await tx.verificationToken.create({
+            data: {
+              email: data.email,
+              token: otp,
+              expires: new Date(Date.now() + 10 * 60 * 1000), // 10 minute expiry
+              type: "EMAIL_VERIFICATION",
             },
           });
 
@@ -99,12 +112,9 @@ export const authController = {
         },
       );
 
+      await sendVerificationEmail(newUser.email, otp);
+
       // 5. Generate Session
-      const tokens = generateTokens(newUser.id, newUser.role);
-      setAuthCookies(res, {
-        refreshToken: tokens.refreshToken,
-        accessToken: tokens.accessToken,
-      });
 
       const admins = await prisma.user.findMany({
         where: { role: { in: ["ADMIN", "SUPERADMIN"] } },
@@ -120,44 +130,27 @@ export const authController = {
       );
 
       await Promise.all([
-        // 1. Log Activity
         logActivity(
-          `New ${newUser.role} registered: ${newUser.username}`,
+          `Pending registration: ${newUser.email}`,
           "INFO",
           newUser.id,
           "AuthService.register",
         ),
-
-        // 2. Welcome the New User (Saved to DB + Socket)
-        sendNotification({
-          userId: newUser.id,
-          type: "WELCOME",
-          content: `Welcome to KAF Portal, ${newUser.firstName}! Please complete your profile.`,
-          link: "/dashboard/onboarding",
-          room: newUser.id, // Targeted room
-        }),
-
-        // 3. Notify all Admins (Saved to DB + Socket)
         ...admins.map((admin) =>
           sendNotification({
             userId: admin.id,
             type: "USER_REGISTRATION",
-            content: `New ${newUser.role} registered: ${newUser.firstName} ${newUser.lastName}`,
+            content: `New ${newUser.role} sign-up (Pending): ${newUser.firstName}`,
             link: `/dashboard/admin/users/${newUser.id}`,
-            room: admin.id, // Or "ADMIN_ROOM" if your socket setup supports it
+            room: admin.id,
           }),
         ),
       ]);
 
       return res.status(201).json({
         success: true,
-        message: "Registration successful",
-        user: {
-          id: newUser.id,
-          username: newUser.username,
-          role: newUser.role,
-          isActive: newUser.isActive,
-        },
+        message: "Registration initiated. Please verify your email.",
+        email: newUser.email,
       });
     } catch (err) {
       console.error("[AUTH_CONTROLLER_REGISTER]", err);
@@ -165,6 +158,67 @@ export const authController = {
     }
   },
 
+  verifyEmail: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { email, otp } = req.body;
+
+      console.log(req.body);
+
+      if (!email || !otp) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Email and OTP are required" });
+      }
+      const result = await prisma.$transaction(async (tx) => {
+        const valideToken = await tx.verificationToken.findFirst({
+          where: {
+            email: email,
+            token: otp,
+            type: "EMAIL_VERIFICATION",
+            expires: { gt: new Date() },
+          },
+        });
+
+        if (!valideToken) throw new Error("INVALID_TOKEN");
+
+        const user = await tx.user.update({
+          where: { email },
+          data: { isActive: true },
+        });
+
+        await tx.verificationToken.delete({
+          where: { id: valideToken.id },
+        });
+        return user;
+      });
+
+      const tokens = generateTokens(result.id, result.role);
+      setAuthCookies(res, {
+        refreshToken: tokens.refreshToken,
+        accessToken: tokens.accessToken,
+      });
+
+      await sendNotification({
+        userId: result.id,
+        type: "WELCOME",
+        content: `Verification successful! Welcome to Bid-Sync, ${result.firstName}.`,
+        link: "/dashboard",
+        room: result.id,
+      });
+      return res.status(200).json({
+        success: true,
+        message: "Email verified successfully",
+        user: {
+          id: result.id,
+          username: result.username,
+          role: result.role,
+          isActive: result.isActive,
+        },
+      });
+    } catch (err) {
+      handleError("POST /auth/otp", err, res);
+    }
+  },
   /**
    * Identifies user by email or username, verifies password,
    * and issues HTTP-only JWT cookies.
