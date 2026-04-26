@@ -15,7 +15,11 @@ import { getIO } from "../../config/socket.js";
 import { sendNotification } from "../../shared/utils/notification.js";
 import { v4 as uuid } from "uuid";
 import crypto from "crypto";
-import { sendVerificationEmail } from "../../shared/utils/mail.js";
+import {
+  sendWellcomeEmail,
+  sendVerificationEmailWithRetry,
+  sendWellcomeEmailRetry,
+} from "../../shared/utils/mail.js";
 
 const saltRound = Number(process.env.SALT_ROUNDS) || 10;
 type TransactionClient = Prisma.TransactionClient;
@@ -112,7 +116,62 @@ export const authController = {
         },
       );
 
-      await sendVerificationEmail(newUser.email, otp);
+      let emailSent = false;
+      let emailError: string | null = null;
+      try {
+        await sendVerificationEmailWithRetry(newUser.email, otp, 3);
+        emailSent = true;
+
+        await logActivity(
+          `Verification email sent to ${newUser.email}`,
+          "INFO",
+          newUser.id,
+          "AuthService.register",
+          { email: newUser.email, otpSent: true },
+        );
+      } catch (emailErr) {
+        emailError =
+          emailErr instanceof Error ? emailErr.message : "Unknown email error";
+        console.error("[EMAIL_SERVICE_FAILURE]", emailErr);
+
+        await logActivity(
+          `Failed to send verification email to ${newUser.email}: ${emailError}`,
+          "CRITICAL",
+          newUser.id,
+          "AuthService.register",
+          { email: newUser.email, error: emailError, retriesAttempted: 3 },
+        );
+
+        await prisma.systemLog.create({
+          data: {
+            level: "CRITICAL",
+            message: `Email service failure during registration`,
+            context: "AuthService.register",
+            payload: {
+              userId: newUser.id,
+              email: newUser.email,
+              error: emailError,
+            },
+          },
+        });
+
+        const admins = await prisma.user.findMany({
+          where: { role: { in: ["ADMIN", "SUPERADMIN"] } },
+          select: { id: true },
+        });
+
+        await Promise.allSettled(
+          admins.map((admin) =>
+            sendNotification({
+              userId: admin.id,
+              type: "SYSTEM_ALERT",
+              content: `⚠️ Email service failed for user registration: ${newUser.email}`,
+              link: `/dashboard/admin/users/${newUser.id}`,
+              room: admin.id,
+            }),
+          ),
+        );
+      }
 
       // 5. Generate Session
 
@@ -129,7 +188,13 @@ export const authController = {
         "AuthService.register",
       );
 
-      await Promise.all([
+      await Promise.allSettled([
+        logActivity(
+          `New ${newUser.role} registered: ${newUser.username}`,
+          "INFO",
+          newUser.id,
+          "AuthService.register",
+        ),
         logActivity(
           `Pending registration: ${newUser.email}`,
           "INFO",
@@ -147,17 +212,70 @@ export const authController = {
         ),
       ]);
 
-      return res.status(201).json({
-        success: true,
-        message: "Registration initiated. Please verify your email.",
-        email: newUser.email,
-      });
+      if (emailSent) {
+        return res.status(201).json({
+          success: true,
+          message: "Registration initiated. Please verify your email.",
+          email: newUser.email,
+          requiresVerification: true,
+        });
+      } else {
+        // Email failed but user is created - provide alternative flow
+        return res.status(201).json({
+          success: true,
+          message:
+            "Account created but verification email could not be sent. Please contact support or request a new verification code.",
+          email: newUser.email,
+          requiresVerification: true,
+          emailFailed: true,
+          canResend: true,
+        });
+      }
     } catch (err) {
       console.error("[AUTH_CONTROLLER_REGISTER]", err);
       handleError("POST /auth/register", err, res);
     }
   },
 
+  resendOtp: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { email } = req.body;
+
+      const user = await prisma.user.findUnique({
+        where: { email: email },
+      });
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.isActive) {
+        return res.status(400).json({ message: "Email already verified" });
+      }
+
+      const otp = crypto.randomInt(100000, 999999).toString();
+
+      await prisma.verificationToken.upsert({
+        where: { email_token: { email, token: otp } }, // Need to adjust unique constraint
+        update: {
+          token: otp,
+          expires: new Date(Date.now() + 10 * 60 * 1000),
+        },
+        create: {
+          email,
+          token: otp,
+          expires: new Date(Date.now() + 10 * 60 * 1000),
+          type: "EMAIL_VERIFICATION",
+        },
+      });
+      await sendVerificationEmailWithRetry(email, otp, 3);
+
+      res.json({ success: true, message: "New verification code sent" });
+    } catch (err) {
+      console.error("[RESEND_OTP]", err);
+      handleError("POST /auth/resend-otp", err, res);
+    }
+  },
   verifyEmail: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { email, otp } = req.body;
@@ -205,6 +323,18 @@ export const authController = {
         link: "/dashboard",
         room: result.id,
       });
+
+      if (result.role === "BUYER" || result.role === "SUPPLIER") {
+        await sendWellcomeEmailRetry(
+          5,
+          1000,
+          result.email,
+          result.firstName,
+          result.role,
+          "https://bidsync-app.ezedin.me/dashboard",
+        );
+      }
+
       return res.status(200).json({
         success: true,
         message: "Email verified successfully",
@@ -225,6 +355,7 @@ export const authController = {
    */
   login: async (req: Request, res: Response) => {
     try {
+      console.log(req.body);
       // 1. Validate Input Schema
       const { identifier, password } = userLoginInputSchema.parse(req.body);
 
@@ -419,6 +550,15 @@ export const authController = {
                 },
                 orderBy: { uploadedAt: "desc" },
               },
+            },
+          },
+          activityLogs: {
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            select: {
+              id: true,
+              action: true,
+              createdAt: true,
             },
           },
         },

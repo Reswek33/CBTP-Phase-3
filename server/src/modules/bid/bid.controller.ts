@@ -15,8 +15,10 @@ export const bidController = {
       const { rfpId } = req.params as { rfpId: string };
       const userId = req.user?.id;
       const { amount, proposal } = req.body;
+      const file = req.file;
       const io = getIO();
 
+      if (!file) throw new Error("Proposal file is required!");
       const result = await prisma.$transaction(
         async (tx: TransactionClient) => {
           const rfp = await tx.rfp.findUnique({
@@ -41,7 +43,17 @@ export const bidController = {
               proposal,
               rfpId,
               supplierId: userId!,
-              status: "ACTIVE",
+              status: "PENDING_APPROVAL",
+              documents: {
+                create: {
+                  fileName: file.originalname,
+                  filePath: file.path,
+                  status: "PENDING",
+                },
+              },
+            },
+            include: {
+              documents: true,
             },
           });
           io.to(rfpId).emit("new_bid_received", {
@@ -132,7 +144,10 @@ export const bidController = {
 
           await tx.rfp.update({
             where: { id: bid.rfpId },
-            data: { status: "AWARDED" },
+            data: {
+              awardedBidId: bid.id,
+              status: "AWARDED",
+            },
           });
 
           const winningBid = await tx.bid.update({
@@ -317,16 +332,37 @@ export const bidController = {
     const { proposal } = req.body;
     const supplierId = req.user?.id as string;
     const io = getIO();
+    const file = req.file;
 
     try {
-      const bid = await prisma.bid.create({
-        data: {
-          rfpId,
-          supplierId,
-          proposal,
-          status: "PENDING_APPROVAL",
-        },
-        include: { rfp: { select: { buyerId: true, title: true } } },
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          messasge: "Proposal file is required",
+        });
+      }
+      const bid = await prisma.$transaction(async (tx) => {
+        const bid = await tx.bid.create({
+          data: {
+            rfpId,
+            supplierId,
+            proposal,
+            status: "PENDING_APPROVAL",
+          },
+          include: {
+            rfp: { select: { buyerId: true, title: true } },
+            documents: true,
+          },
+        });
+
+        tx.proposalDocument.create({
+          data: {
+            bidId: bid.id,
+            fileName: file.originalname,
+            filePath: file.path,
+          },
+        });
+        return bid;
       });
 
       // --- NOTIFICATION & SOCKET LOGIC ---
@@ -347,6 +383,59 @@ export const bidController = {
     } catch (error) {
       console.error("[BIDS_CONTROLLER_APPLY_TO_BID", error);
       handleError("POST /bids/apply/:rfpId", error, res);
+    }
+  },
+
+  reapplyToBid: async (req: AuthenticatedRequest, res: Response) => {
+    const { rfpId } = req.params as { rfpId: string };
+    const supplierId = req.user?.id;
+    const { proposal } = req.body;
+    const file = req.file;
+    try {
+      const existingBid = await prisma.bid.findFirst({
+        where: {
+          rfpId,
+          supplierId,
+          status: "REJECTED",
+        },
+      });
+
+      if (!file) throw new Error("Proposal Document is required!");
+
+      if (!existingBid) {
+        return res.status(404).json({
+          success: false,
+          message: "No rejected bid found to reapply",
+        });
+      }
+
+      const updatedBid = await prisma.$transaction(async (tx) => {
+        // Update the existing bid
+        const bid = await tx.bid.update({
+          where: { id: existingBid.id },
+          data: {
+            status: "PENDING_APPROVAL",
+            proposal: proposal,
+            rejectionReason: null,
+            proposalPath: file?.path,
+            documents: {
+              create: {
+                fileName: file.originalname,
+                filePath: file.path,
+                status: "PENDING",
+              },
+            },
+          },
+        });
+        return bid;
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: updatedBid,
+      });
+    } catch (err) {
+      handleError("POST /bids/:rfpId/reapply", err, res);
     }
   },
 

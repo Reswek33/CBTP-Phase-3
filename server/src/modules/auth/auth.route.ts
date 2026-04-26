@@ -8,6 +8,7 @@ router
   // public route
   .post("/register", authController.register)
   .post("/verify-email", authController.verifyEmail)
+  .post("/resend-otp", authController.resendOtp)
   .post("/login", authController.login)
   // cookies are needed
   .post("/refresh", authController.refreshTokenHandler)

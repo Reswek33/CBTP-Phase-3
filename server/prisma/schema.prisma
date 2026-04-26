@@ -16,6 +16,12 @@ enum Role {
   BUYER
 }
 
+enum ProposalDocumentStatus {
+  REJECTED
+  APPROVED
+  PENDING
+}
+
 enum TokenType {
   EMAIL_VERIFICATION
   PASSWORD_RESET
@@ -52,6 +58,7 @@ enum BidStatus {
   OUTBID
   WITHDRAWN
   AWARDED
+  REJECTED
 }
 
 enum Currency {
@@ -197,21 +204,37 @@ model Rfp {
 }
 
 model Bid {
-  id              String    @id @default(uuid()) @db.Uuid
-  rfpId           String    @map("rfp_id") @db.Uuid
-  supplierId      String    @map("supplier_id") @db.Uuid
-  amount          Decimal?  @db.Decimal(15, 2)
+  id              String             @id @default(uuid()) @db.Uuid
+  rfpId           String             @map("rfp_id") @db.Uuid
+  supplierId      String             @map("supplier_id") @db.Uuid
+  amount          Decimal?           @db.Decimal(15, 2)
   proposal        String?
-  proposalPath    String?   @map("proposal_path")
-  status          BidStatus @default(PENDING_APPROVAL)
-  rejectionReason String?   @map("rejection_reason")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  proposalPath    String?            @map("proposal_path")
+  status          BidStatus          @default(PENDING_APPROVAL)
+  rejectionReason String?            @map("rejection_reason")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  documents       ProposalDocument[]
 
   rfp      Rfp      @relation(fields: [rfpId], references: [id])
   supplier Supplier @relation(fields: [supplierId], references: [id])
 
   @@unique([rfpId, supplierId])
   @@map("bids")
+}
+
+model ProposalDocument {
+  id         String                 @id @default(uuid()) @db.Uuid
+  bidId      String                 @map("bid_id") @db.Uuid
+  title      String?
+  fileName   String                 @map("file_name")
+  filePath   String                 @map("file_path")
+  status     ProposalDocumentStatus @default(PENDING)
+  uploadedAt DateTime               @default(now()) @map("uploaded_at")
+
+  bid Bid @relation(fields: [bidId], references: [id], onDelete: Cascade)
+
+  @@index([bidId])
+  @@map("proposal_documents")
 }
 
 model SupplierDocument {

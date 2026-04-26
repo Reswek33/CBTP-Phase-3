@@ -92,6 +92,7 @@ export const rfpsController = {
 
       return res.status(201).json({ success: true, data: rfp });
     } catch (error) {
+      console.log("[RFP_CONTROLLER_CREATE]", error);
       handleError("POST /rfps", error, res);
     }
   },
