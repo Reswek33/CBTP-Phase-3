@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import express from "express";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 
@@ -21,6 +21,7 @@ import userRoutes from "./modules/user/user.route.js";
 import { initSocket } from "./config/socket.js";
 import path, { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import handleError from "./shared/utils/error.js";
 
 const app = express();
 const server = createServer(app);
@@ -43,12 +44,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-const BASE_URL = isProduction ? vpsURL : "http://localhost:5173";
-console.log("BASE_URL: ", BASE_URL);
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://bidsync-app.ezedin.me",
+  "https://bid-sync-frontend.vercel.app",
+];
 
 app.use(
   cors({
-    origin: BASE_URL,
+    origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -94,6 +98,10 @@ app.use((req: Request, res: Response) => {
     success: false,
     message: `Route ${req.originalUrl} not found`,
   });
+});
+
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  handleError("[GLOBAL_ERROR]", err, res);
 });
 
 server.listen(PORT, () => {
