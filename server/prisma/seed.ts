@@ -13,11 +13,25 @@ async function main() {
   const passwordHash = await bcrypt.hash("1234567890", salt);
 
   console.log("--- Cleaning database ---");
-  // Order matters due to foreign key constraints
+
+  await prisma.verificationToken.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.conversation.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.activityLog.deleteMany();
+  await prisma.systemLog.deleteMany();
+
+  await prisma.buyerDocument.deleteMany();
+  await prisma.supplierDocument.deleteMany();
+  await prisma.rfpDocument.deleteMany();
+
   await prisma.bid.deleteMany();
+
   await prisma.rfp.deleteMany();
+
   await prisma.supplier.deleteMany();
   await prisma.buyer.deleteMany();
+
   await prisma.user.deleteMany();
 
   console.log("--- Seeding Users and Profiles ---");
@@ -30,6 +44,7 @@ async function main() {
       email: "admin@system.com",
       passwordHash: passwordHash,
       role: "SUPERADMIN",
+      isActive: true,
     },
   });
 }
