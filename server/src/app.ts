@@ -5,7 +5,7 @@ import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import type { NextFunction, Request, Response } from "express";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
+// import rateLimit from "express-rate-limit";
 
 import authRoutes from "./modules/auth/auth.route.js";
 import rfpsRoutes from "./modules/rfps/rfps.route.js";
@@ -59,17 +59,17 @@ app.use(
   }),
 );
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: {
-    status: 429,
-    message:
-      "Too many requests from this IP, please try again after 15 minutes",
-  },
-});
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 100,
+//   message: {
+//     status: 429,
+//     message:
+//       "Too many requests from this IP, please try again after 15 minutes",
+//   },
+// });
 
-app.use(limiter);
+// app.use(limiter)/;
 app.use(cookieParser());
 
 // Routes
