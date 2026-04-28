@@ -7,13 +7,31 @@ datasource db {
   provider = "postgresql"
 }
 
-// --- Enums ---
-
 enum Role {
   ADMIN
   SUPERADMIN
   SUPPLIER
   BUYER
+}
+
+enum BiddingType {
+  PUBLIC
+  CLOSED
+}
+
+enum BidRoomStatus {
+  SCHEDULED    // Not yet started
+  ACTIVE       // Currently accepting bids
+  CLOSED       // Bidding ended
+  CANCELLED    // Cancelled by buyer
+  AWARDED      // Winner selected
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
 }
 
 enum ProposalDocumentStatus {
@@ -99,6 +117,12 @@ model User {
   sentMessages      Message[]          @relation("Sender")
   verifiedDocuments SupplierDocument[] @relation("Verifier")
   buyerDocuments    BuyerDocument[]    @relation("BuyerDocumentVerifier")
+  
+  // Bid Room Relations
+  bidRoomsCreated   BidRoom[]          @relation("BuyerBidRooms")
+  awardedBidRooms   BidRoom[]          @relation("AwardedBy")
+  roomInvitations   BidRoomInvitation[] @relation("Inviter")
+  bidActivities     BidActivityLog[]    @relation("Actor")
 
   @@index([username, role])
   @@map("users")
@@ -128,6 +152,10 @@ model Supplier {
   documents     SupplierDocument[]
   bids          Bid[]
   conversations Conversation[]
+  
+  // Bid Room Relations
+  roomInvitations BidRoomInvitation[]
+  roomBids        RoomBid[]
 
   @@map("suppliers")
 }
@@ -143,7 +171,7 @@ model Buyer {
   address            String?
   department         String?
   position           String?
-  status             BuyerStatus @default(PENDING) // Changed from SupplierStatus
+  status             BuyerStatus @default(PENDING)
   verificationStatus Boolean?    @default(false)
   verifiedAt         DateTime?   @map("verified_at")
   rejectedReason     String?     @map("rejected_reason")
@@ -190,6 +218,7 @@ model Rfp {
 
   awardedBidId String? @map("awarded_bid_id") @db.Uuid
 
+  requiresApproval Boolean          @default(true)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -197,6 +226,7 @@ model Rfp {
   bids          Bid[]
   documents     RfpDocument[]
   conversations Conversation[]
+  bidRooms      BidRoom[]
 
   @@index([buyerId])
   @@index([status])
@@ -213,10 +243,13 @@ model Bid {
   status          BidStatus          @default(PENDING_APPROVAL)
   rejectionReason String?            @map("rejection_reason")
   createdAt       DateTime           @default(now()) @map("created_at")
-  documents       ProposalDocument[]
-
-  rfp      Rfp      @relation(fields: [rfpId], references: [id])
-  supplier Supplier @relation(fields: [supplierId], references: [id])
+  
+  isEligibleForBidRoom Boolean        @default(false) @map("is_eligible_for_bid_room")
+  invitedToBidRoom    Boolean         @default(false) @map("invited_to_bid_room")
+  
+  rfp       Rfp                @relation(fields: [rfpId], references: [id])
+  supplier  Supplier           @relation(fields: [supplierId], references: [id])
+  documents ProposalDocument[]
 
   @@unique([rfpId, supplierId])
   @@map("bids")
@@ -280,7 +313,6 @@ model SystemLog {
   @@map("system_logs")
 }
 
-// Minimal placeholder models for the remaining relations
 model ActivityLog {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @db.Uuid
@@ -334,4 +366,99 @@ model VerificationToken {
   type    TokenType
 
   @@unique([email, token])
+}
+
+model BidRoom {
+  id            String         @id @default(uuid()) @db.Uuid
+  rfpId         String         @map("rfp_id") @db.Uuid
+  buyerId       String         @map("buyer_id") @db.Uuid
+  biddingType   BiddingType    @default(PUBLIC)
+  status        BidRoomStatus  @default(SCHEDULED)
+  
+  startTime     DateTime       @map("start_time")
+  endTime       DateTime       @map("end_time")
+  duration      Int?           
+  
+  winningBidId  String?        @map("winning_bid_id") @db.Uuid
+  awardedAt     DateTime?      @map("awarded_at")
+  awardedBy     String?        @map("awarded_by") @db.Uuid
+  
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  
+  rfp           Rfp            @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  buyer         User           @relation("BuyerBidRooms", fields: [buyerId], references: [id])
+  awardedByUser User?          @relation("AwardedBy", fields: [awardedBy], references: [id])
+  
+  invitations   BidRoomInvitation[]
+  bids          RoomBid[]
+  activityLogs  BidActivityLog[]
+  
+  @@index([rfpId])
+  @@index([status])
+  @@index([startTime, endTime])
+  @@map("bid_rooms")
+}
+
+model BidRoomInvitation {
+  id             String            @id @default(uuid()) @db.Uuid
+  bidRoomId      String            @map("bid_room_id") @db.Uuid
+  supplierId     String            @map("supplier_id") @db.Uuid
+  invitedBy      String            @map("invited_by") @db.Uuid
+  status         InvitationStatus  @default(PENDING)
+  invitedAt      DateTime          @default(now()) @map("invited_at")
+  respondedAt    DateTime?         @map("responded_at")
+  expiresAt      DateTime?         @map("expires_at")
+  
+  bidRoom        BidRoom           @relation(fields: [bidRoomId], references: [id], onDelete: Cascade)
+  supplier       Supplier          @relation(fields: [supplierId], references: [id])
+  inviter        User              @relation("Inviter", fields: [invitedBy], references: [id])
+  
+  @@unique([bidRoomId, supplierId])
+  @@index([bidRoomId, status])
+  @@map("bid_room_invitations")
+}
+
+model RoomBid {
+  id             String         @id @default(uuid()) @db.Uuid
+  bidRoomId      String         @map("bid_room_id") @db.Uuid
+  supplierId     String         @map("supplier_id") @db.Uuid
+  amount         Decimal        @db.Decimal(15, 2)
+  currency       Currency       @default(ETB)
+  
+  encryptedAmount String?       @map("encrypted_amount")
+  isBlindBid     Boolean        @default(false)
+  
+  bidOrder       Int?           @map("bid_order")
+  previousAmount Decimal?       @map("previous_amount")   @db.Decimal(15, 2)
+  
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  
+  bidRoom        BidRoom        @relation(fields: [bidRoomId], references: [id], onDelete: Cascade)
+  supplier       Supplier       @relation(fields: [supplierId], references: [id])
+  
+  ipAddress      String?        @map("ip_address")
+  userAgent      String?        @map("user_agent")
+  
+  @@unique([bidRoomId, supplierId])
+  @@index([bidRoomId, amount])
+  @@map("room_bids")
+}
+
+model BidActivityLog {
+  id             String         @id @default(uuid()) @db.Uuid
+  bidRoomId      String         @map("bid_room_id") @db.Uuid
+  actorId        String         @map("actor_id") @db.Uuid
+  action         String         
+  details        Json?          
+  oldAmount      Decimal?       @map("old_amount") @db.Decimal(15, 2)
+  newAmount      Decimal?       @map("new_amount") @db.Decimal(15, 2)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  
+  bidRoom        BidRoom        @relation(fields: [bidRoomId], references: [id], onDelete: Cascade)
+  actor          User           @relation("Actor", fields: [actorId], references: [id])
+  
+  @@index([bidRoomId, createdAt])
+  @@map("bid_activity_logs")
 }

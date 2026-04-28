@@ -7,8 +7,17 @@ import {
 } from "../../shared/middleware/authMiddleware.js";
 
 const router = Router();
+
+router.get(
+  "/eligible-for-bidroom",
+  authenticateUser,
+  requireRole(["BUYER", "ADMIN", "SUPERADMIN"]),
+  supplierController.getEligibleSuppliers,
+);
+
+router.use(authenticateUser, requireRole(["SUPPLIER"]));
+
 router
-  .use(authenticateUser, requireRole(["SUPPLIER"]))
   .post(
     "/documents",
     handleFileUpload("business_doc"),

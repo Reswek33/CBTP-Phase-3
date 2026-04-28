@@ -17,6 +17,7 @@ import chatRouter from "./modules/chat/chat.route.js";
 import notificationRoutes from "./modules/notification/notification.route.js";
 import statsRoute from "./modules/status/stats.route.js";
 import userRoutes from "./modules/user/user.route.js";
+import bidRoomRoutes from "./modules/bidroom/bidroom.route.js";
 
 import { initSocket } from "./config/socket.js";
 import path, { dirname } from "node:path";
@@ -47,7 +48,7 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 const allowedOrigins = [
   "http://localhost:5173",
   "https://bidsync-app.ezedin.me",
-  "https://bid-sync-frontend.vercel.app",
+  "https://bid-sync-blush.vercel.app",
 ];
 
 app.use(
@@ -83,6 +84,7 @@ app.use(`${API_PREFIX}/chat`, chatRouter);
 app.use(`${API_PREFIX}/notifications`, notificationRoutes);
 app.use(`${API_PREFIX}/stats`, statsRoute);
 app.use(`${API_PREFIX}/users`, userRoutes);
+app.use(`${API_PREFIX}/rooms`, bidRoomRoutes);
 
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({

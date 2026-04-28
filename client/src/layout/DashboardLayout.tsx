@@ -334,6 +334,13 @@ export const DashboardLayout: React.FC = () => {
       roles: ["SUPPLIER", "BUYER"],
       highlight: isPending,
     },
+    // Add to navigationItems array
+    {
+      label: "Bid Rooms",
+      path: "/dashboard/bidroom",
+      icon: <Target className="w-4 h-4" />,
+      roles: ["BUYER", "SUPPLIER", "ADMIN"],
+    },
     {
       label: "Admin",
       path: "/dashboard/admin",

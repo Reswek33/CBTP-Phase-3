@@ -13,6 +13,9 @@ import { UnauthorizedPage } from "@/pages/UnauthorizedPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { VerifyOtpPage } from "@/pages/VerifyOtpPage";
 import LissajousLoader from "@/components/ui/LissajousDrift";
+import { BidRoomCreatePage } from "@/pages/BidRoomCreatePage";
+import { BidRoomDetailPage } from "@/pages/BidRoomDetailPage";
+import { BidRoomPage } from "@/pages/BidRoomPage";
 
 // 1. Lazy load ALL page components
 const Login = lazy(() => import("../pages/LoginPage"));
@@ -98,6 +101,33 @@ export const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <DashboardHome />
+          </Suspense>
+        ),
+        errorElement: <ErrorPage />,
+      },
+      {
+        path: "bidroom",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <BidRoomPage />
+          </Suspense>
+        ),
+        errorElement: <ErrorPage />,
+      },
+      {
+        path: "bidroom/create",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <BidRoomCreatePage />
+          </Suspense>
+        ),
+        errorElement: <ErrorPage />,
+      },
+      {
+        path: "bidroom/:id",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <BidRoomDetailPage />
           </Suspense>
         ),
         errorElement: <ErrorPage />,

@@ -445,10 +445,15 @@ export const bidController = {
       const { status, rejectionReason } = req.body;
       const io = getIO();
 
+      const isEligible = status === "ACTIVE";
+
       const bid = await prisma.bid.update({
         where: { id: bidId },
-        data: { status, rejectionReason },
-        include: { rfp: { select: { title: true } } },
+        data: { status, rejectionReason, isEligibleForBidRoom: isEligible },
+        include: {
+          rfp: { select: { title: true } },
+          supplier: { select: { businessName: true } },
+        },
       });
 
       // --- NOTIFICATION & SOCKET LOGIC ---

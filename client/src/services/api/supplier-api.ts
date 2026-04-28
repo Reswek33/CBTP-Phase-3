@@ -24,3 +24,11 @@ export const deleteDocument = async (docId: string) => {
   const response = await api.delete(`/supplier/documents/${docId}/delete`);
   return response.data;
 };
+
+export const getSuppliersForInvite = async (params = {}) => {
+  const response = await api.get("/supplier/eligible-for-bidroom", {
+    params,
+  });
+  console.log(response.data);
+  return response.data;
+};

@@ -224,4 +224,274 @@ export const supplierController = {
       handleError("GET /supplier/bids", error, res);
     }
   },
+
+  getEligibleSuppliers: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const buyerId = req.user?.id;
+      const { rfpId, searchTerm, category, limit, page } = req.query;
+
+      console.log(req.query);
+      if (!buyerId) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized",
+        });
+      }
+
+      const pageNum = Math.max(1, parseInt(page as string) || 1);
+      const limitNum = Math.min(100, parseInt(limit as string) || 20);
+      const skip = (pageNum - 1) * limitNum;
+
+      // Build filter conditions
+      const whereConditions: any = {
+        status: "VERIFIED",
+        user: {
+          isActive: true,
+        },
+      };
+
+      // Category filter
+      if (category) {
+        whereConditions.categories = {
+          has: category as string,
+        };
+      } else if (rfpId) {
+        // Get RFP categories to match
+        const rfp = await prisma.rfp.findUnique({
+          where: { id: rfpId as string },
+          select: { category: true },
+        });
+
+        if (rfp && rfp.category) {
+          const categories = rfp.category.split(",").map((c) => c.trim());
+          whereConditions.categories = {
+            hasSome: categories,
+          };
+        }
+      }
+
+      // Search filter
+      if (searchTerm) {
+        whereConditions.OR = [
+          {
+            businessName: {
+              contains: searchTerm as string,
+              mode: "insensitive",
+            },
+          },
+          {
+            user: {
+              email: { contains: searchTerm as string, mode: "insensitive" },
+            },
+          },
+          {
+            user: {
+              firstName: {
+                contains: searchTerm as string,
+                mode: "insensitive",
+              },
+            },
+          },
+          {
+            user: {
+              lastName: { contains: searchTerm as string, mode: "insensitive" },
+            },
+          },
+        ];
+      }
+
+      // If RFP ID provided, exclude already invited suppliers
+      let invitedSupplierIds: string[] = [];
+      if (rfpId) {
+        const existingInvitations = await prisma.bidRoomInvitation.findMany({
+          where: {
+            bidRoom: {
+              rfpId: rfpId as string,
+            },
+          },
+          select: { supplierId: true },
+        });
+        invitedSupplierIds = existingInvitations.map((inv) => inv.supplierId);
+
+        if (invitedSupplierIds.length > 0) {
+          whereConditions.id = {
+            notIn: invitedSupplierIds,
+          };
+        }
+      }
+
+      // Get total count
+      const total = await prisma.supplier.count({
+        where: whereConditions,
+      });
+
+      // Get eligible suppliers
+      const suppliers = await prisma.supplier.findMany({
+        where: whereConditions,
+        select: {
+          id: true,
+          businessName: true,
+          phone: true,
+          address: true,
+          businessType: true,
+          categories: true,
+          verificationStatus: true,
+          yearsInBusiness: true,
+          taxId: true,
+          registrationNumber: true,
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          _count: {
+            select: {
+              bids: true,
+              documents: true,
+            },
+          },
+        },
+        orderBy: [{ businessName: "asc" }],
+        skip,
+        take: limitNum,
+      });
+
+      // Calculate average bid amount (optional ranking metric)
+      const suppliersWithMetrics = await Promise.all(
+        suppliers.map(async (supplier) => {
+          const bids = await prisma.bid.aggregate({
+            where: {
+              supplierId: supplier.id,
+              status: { in: ["ACTIVE", "AWARDED"] },
+            },
+            _avg: {
+              amount: true,
+            },
+          });
+
+          return {
+            ...supplier,
+            averageBidAmount: bids._avg.amount || 0,
+            totalBidsSubmitted: supplier._count.bids,
+            totalDocuments: supplier._count.documents,
+          };
+        }),
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: suppliersWithMetrics,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+        filters: {
+          rfpId: rfpId || null,
+          category: category || null,
+          searchTerm: searchTerm || null,
+        },
+      });
+    } catch (error) {
+      console.error("[GET_ELIGIBLE_SUPPLIERS]", error);
+      handleError("GET /eligible-suppliers", error, res);
+    }
+  },
+
+  getSupplierForInvitation: async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ) => {
+    try {
+      const { supplierId } = req.params as { supplierId: string };
+      const buyerId = req.user?.id;
+
+      if (!buyerId) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized",
+        });
+      }
+
+      const supplier = await prisma.supplier.findUnique({
+        where: {
+          id: supplierId,
+          status: "VERIFIED",
+        },
+        select: {
+          id: true,
+          businessName: true,
+          phone: true,
+          address: true,
+          businessType: true,
+          categories: true,
+          verificationStatus: true,
+          yearsInBusiness: true,
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          bids: {
+            take: 5,
+            orderBy: { createdAt: "desc" },
+            include: {
+              rfp: {
+                select: {
+                  title: true,
+                  status: true,
+                  buyer: {
+                    select: {
+                      companyName: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!supplier) {
+        return res.status(404).json({
+          success: false,
+          message: "Supplier not found or not verified",
+        });
+      }
+
+      // Get performance metrics
+      const bids = await prisma.bid.aggregate({
+        where: {
+          supplierId,
+          status: "AWARDED",
+        },
+        _count: true,
+        _avg: {
+          amount: true,
+        },
+      });
+
+      const responseData = {
+        ...supplier,
+        metrics: {
+          awardedBids: bids._count,
+          averageBidAmount: bids._avg.amount || 0,
+        },
+      };
+
+      return res.status(200).json({
+        success: true,
+        data: responseData,
+      });
+    } catch (error) {
+      console.error("[GET_SUPPLIER_FOR_INVITATION]", error);
+      handleError("GET /eligible-suppliers/:supplierId", error, res);
+    }
+  },
 };
