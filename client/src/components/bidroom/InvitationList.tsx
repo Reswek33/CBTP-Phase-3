@@ -36,7 +36,7 @@ export const InvitationsList: React.FC<InvitationsListProps> = ({
   ) => {
     setProcessingId(invitationId);
     try {
-      await updateInvitationStatus(invitationId, { status });
+      await updateInvitationStatus(invitationId, status);
       onUpdate();
     } catch (error: any) {
       alert(error.response?.data?.message || "Failed to update invitation");

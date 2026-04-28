@@ -214,10 +214,6 @@ export const ChatPage: React.FC = () => {
           ),
         );
 
-        // Emit socket event to update other clients
-        if (socket) {
-          socket.emit("mark_messages_read", { conversationId });
-        }
       } catch (err) {
         console.error("Failed to mark messages as read", err);
       } finally {

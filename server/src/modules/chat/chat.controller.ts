@@ -242,7 +242,6 @@ export const chatController = {
   markMessageAsRead: async (req: AuthenticatedRequest, res: Response) => {
     const { conversationId } = req.params as { conversationId: string };
     const userId = req.user?.id;
-    const io = getIO();
 
     try {
       await prisma.message.updateMany({
@@ -288,7 +287,13 @@ export const chatController = {
     try {
       const userId = req.user?.id!;
       const unreadMessages = await prisma.message.findMany({
-        where: { id: userId, isRead: false },
+        where: {
+          isRead: false,
+          senderId: { not: userId },
+          conversation: {
+            OR: [{ buyerId: userId }, { supplierId: userId }],
+          },
+        },
       });
 
       return res.status(200).json({

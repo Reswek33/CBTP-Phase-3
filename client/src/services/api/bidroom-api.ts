@@ -3,11 +3,11 @@ import { api } from "./api-client";
 import { z } from "zod";
 
 export const roomCreateInputSchema = z.object({
-  rfpId: z.uuid(),
-  startTime: z.date().transform((str) => new Date(str)),
-  endTime: z.date().transform((str) => new Date(str)),
+  rfpId: z.string().uuid(),
+  startTime: z.coerce.date(),
+  endTime: z.coerce.date(),
   biddingType: z.enum(["PUBLIC", "CLOSED"]),
-  invitedSupplierIds: z.array(z.uuid()),
+  invitedSupplierIds: z.array(z.string().uuid()),
 });
 
 export const invitationUpdateStatusSchema = z.object({
@@ -21,7 +21,7 @@ export const bidAmountInputSchema = z.object({
 export type InvitationUpdateState = z.infer<
   typeof invitationUpdateStatusSchema
 >;
-export type RoomCreateInpute = z.infer<typeof roomCreateInputSchema>;
+export type RoomCreateInput = z.infer<typeof roomCreateInputSchema>;
 export type BidAmountInput = z.infer<typeof bidAmountInputSchema>;
 
 export const getRoomDetail = async (id: string) => {
@@ -39,13 +39,13 @@ export const getRoomHistory = async (id: string) => {
   return response.data;
 };
 
-export const createRoom = async (data: RoomCreateInpute) => {
+export const createRoom = async (data: RoomCreateInput) => {
   const response = await api.post("/rooms/create", data);
   return response.data;
 };
 
-export const awardBid = async (id: string) => {
-  const response = await api.patch(`/rooms/${id}/award`);
+export const awardBidById = async (id: string, winningBidId: string) => {
+  const response = await api.patch(`/rooms/${id}/award`, { winningBidId });
   return response.data;
 };
 
@@ -54,20 +54,27 @@ export const getMyInvitations = async () => {
   return response.data;
 };
 
-export const updateInvitationStatus = async (id: string, status: any) => {
+export const updateInvitationStatus = async (
+  id: string,
+  status: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED",
+) => {
   const response = await api.patch(`/rooms/invitations/${id}`, {
-    status: status,
+    status,
   });
   return response.data;
 };
 
 export const updateBidAmount = async (id: string, amount: BidAmountInput) => {
-  const response = await api.post(`/rooms/${id}/bids`, { amount: amount });
+  const response = await api.post(`/rooms/${id}/bids`, amount);
   return response.data;
 };
 
-export const jointRoom = async (roomId: string) => {
-  const response = await api.post(`/rooms/${roomId}/join`);
+export const joinRoom = async (roomId: string, socketId?: string) => {
+  const response = await api.post(
+    `/rooms/${roomId}/join`,
+    {},
+    socketId ? { headers: { "x-socket-id": socketId } } : undefined,
+  );
   return response.data;
 };
 

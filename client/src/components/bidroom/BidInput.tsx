@@ -26,6 +26,10 @@ export const BidInput: React.FC<BidInputProps> = ({
       alert(`Maximum bid cannot exceed $${maxBid}`);
       return;
     }
+    if (maxBid && amount === maxBid) {
+      alert("Your bid must be lower than the current leading bid");
+      return;
+    }
     await onSubmit(amount);
   };
 
@@ -50,7 +54,7 @@ export const BidInput: React.FC<BidInputProps> = ({
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           Minimum bid: ${minBid.toLocaleString()}
-          {maxBid && ` | Maximum: $${maxBid.toLocaleString()}`}
+          {maxBid && ` | Must be lower than: $${maxBid.toLocaleString()}`}
         </p>
       </div>
       <button

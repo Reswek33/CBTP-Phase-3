@@ -7,8 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   getRoomDetail,
   updateBidAmount,
-  awardBid,
-  jointRoom,
+  awardBidById,
+  joinRoom,
   startRoom,
 } from "@/services/api/bidroom-api";
 import { BidTimer } from "./BidTimer";
@@ -60,30 +60,32 @@ export const BidRoomDetail: React.FC = () => {
     // Only attempt to join and setup sockets if we have a connection and room ID
     if (!socket || !id) return;
 
-    // Logic: Only Suppliers should be registered as participants via jointRoom
     const performJoin = async () => {
-      if (isSupplier && !hasJoined) {
-        try {
-          await jointRoom(id!);
-          setHasJoined(true);
-        } catch (error) {
-          console.error("Failed to join room participant list:", error);
-        }
+      if (hasJoined || !socket.connected || !socket.id) return;
+      try {
+        await joinRoom(id!, socket.id);
+        setHasJoined(true);
+      } catch (error) {
+        console.error("Failed to join room participant list:", error);
       }
     };
 
     performJoin();
+    socket.on("connect", performJoin);
 
     // Join the socket room for real-time updates
-    socket.emit("join_bid_room", id);
-
     socket.on("new_bid", (data) => {
-      setRoom((prev: any) => ({
-        ...prev,
-        currentLeadingBid: data,
-        totalBids: (prev?.totalBids || 0) + 1,
-        bids: [data, ...(prev?.bids || [])],
-      }));
+      setRoom((prev: any) => {
+        if (!prev) return prev;
+        const nextBids = prev.bids ? [...prev.bids] : [];
+        return {
+          ...prev,
+          currentLeadingBid:
+            prev.biddingType === "PUBLIC" ? data : prev.currentLeadingBid,
+          totalBids: (prev.totalBids || 0) + 1,
+          bids: nextBids,
+        };
+      });
     });
 
     socket.on("room_awarded", () => {
@@ -93,23 +95,31 @@ export const BidRoomDetail: React.FC = () => {
     socket.on("room_started", () => {
       fetchRoom();
     });
+    socket.on("room_cancelled", () => {
+      fetchRoom();
+    });
+    socket.on("invitation_updated", () => {
+      fetchRoom();
+    });
 
     return () => {
-      socket.emit("leave_bid_room", id);
+      socket.off("connect", performJoin);
       socket.off("new_bid");
       socket.off("room_awarded");
       socket.off("room_started");
+      socket.off("room_cancelled");
+      socket.off("invitation_updated");
     };
-  }, [socket, id, hasJoined, isSupplier]);
+  }, [socket, id, hasJoined]);
+
+  useEffect(() => {
+    setHasJoined(false);
+  }, [id]);
 
   const handlePlaceBid = async (amount: number) => {
     setSubmitting(true);
     try {
       await updateBidAmount(id!, { amount });
-      // Socket emission is handled locally, but typically the server broadcasts 'new_bid'
-      if (socket) {
-        socket.emit("place_bid", { roomId: id, amount });
-      }
     } catch (error: any) {
       alert(error.response?.data?.message || "Failed to place bid");
     } finally {
@@ -126,7 +136,11 @@ export const BidRoomDetail: React.FC = () => {
       return;
     setSubmitting(true);
     try {
-      await awardBid(id!);
+      if (!room?.currentLeadingBid?.id) {
+        alert("No leading bid available to award");
+        return;
+      }
+      await awardBidById(id!, room.currentLeadingBid.id);
       fetchRoom();
     } catch (error: any) {
       alert(error.response?.data?.message || "Failed to award bid");
@@ -247,10 +261,7 @@ export const BidRoomDetail: React.FC = () => {
             <Users className="w-4 h-4 text-primary" />
           </div>
           <p className="text-2xl font-bold text-foreground">
-            {/* If API returns a number, use it. If array, use length */}
-            {Array.isArray(room.participants)
-              ? room.participants.length
-              : room.participants || 0}
+            {room.participantsCount || 0}
           </p>
         </div>
       </div>
@@ -305,9 +316,12 @@ export const BidRoomDetail: React.FC = () => {
               <BidInput
                 onSubmit={handlePlaceBid}
                 isSubmitting={submitting}
-                // Ensure math uses numbers rather than JSON strings
-                minBid={(Number(room.currentLeadingBid?.amount) || 0) + 1}
-                maxBid={Number(room.rfp?.budget)}
+                minBid={0}
+                maxBid={
+                  room.biddingType === "PUBLIC"
+                    ? Number(room.currentLeadingBid?.amount || room.rfp?.budget)
+                    : Number(room.rfp?.budget)
+                }
               />
             </div>
           )}

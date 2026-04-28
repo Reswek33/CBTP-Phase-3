@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { createRoom, type RoomCreateInpute } from "@/services/api/bidroom-api";
+import { createRoom, type RoomCreateInput } from "@/services/api/bidroom-api";
 import { getMyRfps } from "@/services/api/rfp-api";
 import { getSuppliersForInvite } from "@/services/api/supplier-api";
 import {
@@ -92,7 +92,7 @@ export const BidRoomCreateForm: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const apiData: RoomCreateInpute = {
+      const apiData: RoomCreateInput = {
         rfpId: formData.rfpId,
         startTime: new Date(formData.startTime),
         endTime: new Date(formData.endTime),

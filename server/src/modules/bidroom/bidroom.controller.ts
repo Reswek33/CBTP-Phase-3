@@ -8,11 +8,11 @@ import { logActivity } from "../../shared/utils/logger.js";
 import { getIO } from "../../config/socket.js";
 
 const roomCreateInputSchema = z.object({
-  rfpId: z.uuid(),
+  rfpId: z.string().uuid(),
   startTime: z.coerce.date(),
   endTime: z.coerce.date(),
   biddingType: z.enum(["PUBLIC", "CLOSED"]),
-  invitedSupplierIds: z.array(z.uuid()),
+  invitedSupplierIds: z.array(z.string().uuid()),
 });
 
 const invitationUpdateStatusSchema = z.object({
@@ -20,12 +20,45 @@ const invitationUpdateStatusSchema = z.object({
 });
 
 const bidAmountInputSchema = z.object({
-  amount: z.transform((str) => Number(str)),
+  amount: z.coerce.number().positive(),
 });
 
 const awardInputSchema = z.object({
-  winningBidId: z.uuid(),
+  winningBidId: z.string().uuid(),
 });
+
+const normalizeRoomStatus = async (
+  roomId: string,
+  currentStatus: "SCHEDULED" | "ACTIVE" | "CLOSED" | "CANCELLED" | "AWARDED",
+  startTime: Date,
+  endTime: Date,
+) => {
+  if (currentStatus === "CANCELLED" || currentStatus === "AWARDED") {
+    return currentStatus;
+  }
+
+  const now = new Date();
+  let nextStatus = currentStatus;
+
+  if (now >= endTime && currentStatus !== "CLOSED") {
+    nextStatus = "CLOSED";
+  } else if (
+    now >= startTime &&
+    now < endTime &&
+    currentStatus === "SCHEDULED"
+  ) {
+    nextStatus = "ACTIVE";
+  }
+
+  if (nextStatus !== currentStatus) {
+    await prisma.bidRoom.update({
+      where: { id: roomId },
+      data: { status: nextStatus },
+    });
+  }
+
+  return nextStatus;
+};
 
 export const bidRoomController = {
   createRoom: async (req: AuthenticatedRequest, res: Response) => {
@@ -35,6 +68,49 @@ export const bidRoomController = {
         roomCreateInputSchema.parse(req.body);
 
       const bidRoom = await prisma.$transaction(async (tx) => {
+        const rfp = await tx.rfp.findFirst({
+          where: {
+            id: rfpId,
+            buyerId,
+            status: "OPEN",
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (!rfp) {
+          throw new Error("RFP not found or not eligible for room creation");
+        }
+
+        if (endTime <= startTime) {
+          throw new Error("End time must be after start time");
+        }
+
+        if (invitedSupplierIds.length === 0) {
+          throw new Error("At least one supplier must be invited");
+        }
+
+        const eligibleBids = await tx.bid.findMany({
+          where: {
+            rfpId,
+            supplierId: { in: invitedSupplierIds },
+            status: "ACTIVE",
+            isEligibleForBidRoom: true,
+          },
+          select: { supplierId: true },
+        });
+
+        const eligibleSupplierIds = new Set(eligibleBids.map((b) => b.supplierId));
+        const ineligibleSuppliers = invitedSupplierIds.filter(
+          (supplierId) => !eligibleSupplierIds.has(supplierId),
+        );
+        if (ineligibleSuppliers.length > 0) {
+          throw new Error(
+            "One or more invited suppliers are not eligible for this bid room",
+          );
+        }
+
         const room = await tx.bidRoom.create({
           data: {
             rfpId,
@@ -54,13 +130,22 @@ export const bidRoomController = {
         }));
 
         await tx.bidRoomInvitation.createMany({ data: invitations });
+        await tx.bid.updateMany({
+          where: {
+            rfpId,
+            supplierId: { in: invitedSupplierIds },
+          },
+          data: {
+            invitedToBidRoom: true,
+          },
+        });
 
         // Create Notifications for Suppliers
         const notifications = invitedSupplierIds.map((id) => ({
           userId: id,
           content: `You have been invited to a ${biddingType} Bid Room for RFP: ${rfpId}`,
           type: "BID_INVITATION",
-          link: `/dashboard/bid-rooms/${room.id}`,
+          link: `/dashboard/bidroom/${room.id}`,
         }));
         await tx.notification.createMany({ data: notifications });
 
@@ -76,6 +161,16 @@ export const bidRoomController = {
         true,
       );
 
+      const io = getIO();
+      bidRoom.invitations.forEach((invitation) => {
+        io.to(invitation.supplierId).emit("new_notification", {
+          userId: invitation.supplierId,
+          type: "BID_INVITATION",
+          content: `You have been invited to a ${biddingType} Bid Room for RFP: ${rfpId}`,
+          link: `/dashboard/bidroom/${bidRoom.room.id}`,
+        });
+      });
+
       return res.status(201).json({
         success: true,
         message: "Room created successfully and invitations sent",
@@ -90,13 +185,11 @@ export const bidRoomController = {
     }
   },
 
-  jointRoom: async (req: AuthenticatedRequest, res: Response) => {
+  joinRoom: async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.user?.id;
       const { roomId } = req.params as { roomId: string };
       const io = getIO();
-      console.log(userId, "Joinded");
-
       const room = await prisma.bidRoom.findFirst({
         where: {
           id: roomId,
@@ -212,31 +305,43 @@ export const bidRoomController = {
         (inv) => inv.supplierId === userId && inv.status === "ACCEPTED",
       );
 
-      if (!isBuyer && !isInvitedSupplier && req.user?.role !== "ADMIN") {
+      if (
+        !isBuyer &&
+        !isInvitedSupplier &&
+        !["ADMIN", "SUPERADMIN"].includes(req.user?.role || "")
+      ) {
         return res.status(403).json({
           success: false,
           message: "Access denied to this room",
         });
       }
 
+      const normalizedStatus = await normalizeRoomStatus(
+        bidroom.id,
+        bidroom.status,
+        bidroom.startTime,
+        bidroom.endTime,
+      );
+
       const participantsCount = bidroom.invitations.filter(
         (i) => i.status === "ACCEPTED",
       ).length;
       const responseModel = {
         id: bidroom.id,
-        status: bidroom.status,
+        status: normalizedStatus,
         startTime: bidroom.startTime,
         endTime: bidroom.endTime,
         biddingType: bidroom.biddingType,
         currentLeadingBid:
           bidroom.biddingType === "PUBLIC" ? bidroom.bids[0] : null,
         totalBids: bidroom.bids.length,
-        participants:
-          bidroom.biddingType === "PUBLIC"
-            ? participantsCount
-            : "Hidden (Closed Bidding)",
+        participants: bidroom.invitations,
+        participantsCount,
         rfp: bidroom.rfp,
-        bids: bidroom.bids,
+        bids:
+          bidroom.biddingType === "CLOSED" && !isBuyer
+            ? []
+            : bidroom.bids,
       };
 
       return res.status(200).json({
@@ -372,7 +477,7 @@ export const bidRoomController = {
           result.currentBest &&
           Number(result.bid.amount) < Number(result.currentBest.amount)
         ) {
-          io.to(`user_${result.currentBest.supplierId}`).emit("outbid", {
+          io.to(result.currentBest.supplierId).emit("outbid", {
             roomId,
             newAmount: result.bid.amount,
             message: "You have been outbid!",
@@ -400,10 +505,8 @@ export const bidRoomController = {
       const userId = req.user?.id;
       const { id } = req.params as { id: string };
       const { status } = invitationUpdateStatusSchema.parse(req.body);
-
-      const invitation = await prisma.bidRoomInvitation.update({
-        where: { id: id, supplierId: userId },
-        data: { status: status as InvitationStatus },
+      const invitation = await prisma.bidRoomInvitation.findFirst({
+        where: { id, supplierId: userId },
         include: { bidRoom: true },
       });
 
@@ -414,7 +517,14 @@ export const bidRoomController = {
         });
       }
 
-      if (invitation.status === "ACCEPTED") {
+      if (invitation.status !== "PENDING") {
+        return res.status(400).json({
+          success: false,
+          message: "Invitation has already been responded to",
+        });
+      }
+
+      if (status === "ACCEPTED") {
         const now = new Date();
         if (now > invitation.bidRoom.endTime) {
           return res.status(400).json({
@@ -424,9 +534,35 @@ export const bidRoomController = {
         }
       }
 
+      const updatedInvitation = await prisma.bidRoomInvitation.update({
+        where: { id },
+        data: {
+          status: status as InvitationStatus,
+          respondedAt: new Date(),
+        },
+      });
+
+      const io = getIO();
+      io.to(`room_${invitation.bidRoomId}`).emit("invitation_updated", {
+        roomId: invitation.bidRoomId,
+        supplierId: invitation.supplierId,
+        status: updatedInvitation.status,
+      });
+      io.to(invitation.bidRoom.buyerId).emit("invitation_updated", {
+        roomId: invitation.bidRoomId,
+        supplierId: invitation.supplierId,
+        status: updatedInvitation.status,
+      });
+      io.to(invitation.bidRoom.buyerId).emit("new_notification", {
+        userId: invitation.bidRoom.buyerId,
+        type: "BID_INVITATION_RESPONSE",
+        content: `A supplier has ${updatedInvitation.status.toLowerCase()} your invitation.`,
+        link: `/dashboard/bidroom/${invitation.bidRoomId}`,
+      });
+
       return res.status(200).json({
         success: true,
-        message: `Invitation is ${invitation.status}`,
+        message: `Invitation is ${updatedInvitation.status}`,
       });
     } catch (err) {
       handleError("PATCH /rooms/invitation/:id", err, res);
@@ -441,30 +577,36 @@ export const bidRoomController = {
       const io = getIO();
 
       const result = await prisma.$transaction(async (tx) => {
-        const room = await tx.bidRoom.update({
+        const room = await tx.bidRoom.findFirst({
           where: { id: roomId, buyerId },
+          include: {
+            invitations: true,
+          },
+        });
+        if (!room) {
+          throw new Error("Room NOT_FOUND");
+        }
+        if (!["ACTIVE", "CLOSED"].includes(room.status)) {
+          throw new Error("Room must be active or closed before awarding");
+        }
+
+        const winningBid = await tx.roomBid.findUnique({
+          where: { id: winningBidId },
+          include: { supplier: { select: { businessName: true } } },
+        });
+        if (!winningBid || winningBid.bidRoomId !== roomId) {
+          throw new Error("Winning bid not found in this room");
+        }
+
+        const updatedRoom = await tx.bidRoom.update({
+          where: { id: roomId },
           data: {
             status: "AWARDED",
             winningBidId,
             awardedBy: buyerId,
             awardedAt: new Date(),
           },
-          include: {
-            invitations: true,
-            bids: {
-              where: { id: winningBidId },
-              include: { supplier: { select: { businessName: true } } },
-            },
-          },
         });
-        if (!room.bids || !Array.isArray(room.bids) || room.bids.length === 0) {
-          throw new Error("Winning bid not found");
-        }
-
-        const winningBid = room.bids[0];
-        if (!winningBid) {
-          throw new Error("Winning bid not found");
-        }
 
         // Safely access supplier info with null check
         const winnerSupplierName =
@@ -478,20 +620,41 @@ export const bidRoomController = {
               ? `🎉 Congratulations! You have been awarded the contract for ${room.rfpId}`
               : `The bid room has been closed and awarded to ${winnerSupplierName}`,
           type: "BID_AWARDED",
-          link: `/dashboard/bid-rooms/${roomId}`,
+          link: `/dashboard/bidroom/${roomId}`,
         }));
 
         await tx.notification.createMany({ data: notifications });
 
-        return room;
+        return {
+          room: updatedRoom,
+          winningBid,
+        };
       });
 
       try {
         io.to(`room_${roomId}`).emit("room_awarded", {
           roomId,
+          winningBidId: result.winningBid.id,
           message:
             "The bid room has been closed and a winner has been selected",
         });
+        result.room &&
+          io.to(result.room.buyerId).emit("room_awarded", {
+            roomId,
+            winningBidId: result.winningBid.id,
+          });
+        io.to(result.winningBid.supplierId).emit("room_awarded", {
+          roomId,
+          winningBidId: result.winningBid.id,
+          winner: true,
+        });
+        result.room &&
+          io.to(result.room.buyerId).emit("new_notification", {
+            userId: result.room.buyerId,
+            type: "BID_AWARDED",
+            content: "You awarded a bid room successfully.",
+            link: `/dashboard/bidroom/${roomId}`,
+          });
       } catch (socketError) {
         console.error("Failed to broadcast room award:", socketError);
       }
@@ -545,6 +708,15 @@ export const bidRoomController = {
 
       const enhancedInvitations = invitations.map((inv) => ({
         ...inv,
+        bidRoom: {
+          ...inv.bidRoom,
+          status:
+            new Date() >= new Date(inv.bidRoom.endTime) &&
+            inv.bidRoom.status !== "AWARDED" &&
+            inv.bidRoom.status !== "CANCELLED"
+              ? "CLOSED"
+              : inv.bidRoom.status,
+        },
         currentLeadingBid: inv.bidRoom.bids[0] || null,
         timeRemaining: Math.max(
           0,
@@ -564,26 +736,50 @@ export const bidRoomController = {
       const { id: roomId } = req.params as { id: string };
       const io = getIO();
 
-      const room = await prisma.bidRoom.update({
+      const room = await prisma.bidRoom.findFirst({
         where: { id: roomId, buyerId },
+        include: { invitations: true },
+      });
+
+      if (!room) {
+        throw new Error("Room NOT_FOUND");
+      }
+      if (room.status !== "SCHEDULED") {
+        throw new Error("Only scheduled rooms can be started");
+      }
+      const now = new Date();
+      if (now > room.endTime) {
+        throw new Error("Cannot start room after end time");
+      }
+
+      const updatedRoom = await prisma.bidRoom.update({
+        where: { id: roomId },
         data: { status: "ACTIVE" },
         include: { invitations: true },
       });
 
       // Notify all invited suppliers
-      const notifications = room.invitations.map((inv) => ({
+      const notifications = updatedRoom.invitations.map((inv) => ({
         userId: inv.supplierId,
         content: `The bid room is now active! Start placing your bids.`,
         type: "BID_ROOM_STARTED",
-        link: `/dashboard/bid-rooms/${roomId}`,
+        link: `/dashboard/bidroom/${roomId}`,
       }));
       await prisma.notification.createMany({ data: notifications });
 
       // Socket broadcast
       io.to(`room_${roomId}`).emit("room_started", {
         roomId,
-        startTime: room.startTime,
-        endTime: room.endTime,
+        startTime: updatedRoom.startTime,
+        endTime: updatedRoom.endTime,
+      });
+      updatedRoom.invitations.forEach((inv) => {
+        io.to(inv.supplierId).emit("new_notification", {
+          userId: inv.supplierId,
+          type: "BID_ROOM_STARTED",
+          content: "The bid room is now active! Start placing your bids.",
+          link: `/dashboard/bidroom/${roomId}`,
+        });
       });
 
       return res
@@ -616,12 +812,78 @@ export const bidRoomController = {
         success: true,
         data: rooms.map((room) => ({
           ...room,
+          status:
+            new Date() >= new Date(room.endTime) &&
+            room.status !== "AWARDED" &&
+            room.status !== "CANCELLED"
+              ? "CLOSED"
+              : room.status,
           acceptedInvitations: room._count.invitations,
           totalBids: room._count.bids,
         })),
       });
     } catch (err) {
       handleError("GET /rooms/my-rooms", err, res);
+    }
+  },
+
+  cancelRoom: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const buyerId = req.user?.id!;
+      const { id: roomId } = req.params as { id: string };
+      const io = getIO();
+
+      const room = await prisma.bidRoom.findFirst({
+        where: { id: roomId, buyerId },
+        include: { invitations: true },
+      });
+      if (!room) {
+        return res.status(404).json({
+          success: false,
+          message: "Room NOT_FOUND",
+        });
+      }
+
+      if (room.status === "AWARDED" || room.status === "CANCELLED") {
+        return res.status(400).json({
+          success: false,
+          message: "Room cannot be cancelled in current state",
+        });
+      }
+
+      await prisma.$transaction([
+        prisma.bidRoom.update({
+          where: { id: roomId },
+          data: { status: "CANCELLED" },
+        }),
+        prisma.notification.createMany({
+          data: room.invitations.map((inv) => ({
+            userId: inv.supplierId,
+            content: "This bid room has been cancelled by the buyer.",
+            type: "BID_ROOM_CANCELLED",
+            link: `/dashboard/bidroom/${roomId}`,
+          })),
+        }),
+      ]);
+
+      io.to(`room_${roomId}`).emit("room_cancelled", {
+        roomId,
+      });
+      room.invitations.forEach((inv) => {
+        io.to(inv.supplierId).emit("new_notification", {
+          userId: inv.supplierId,
+          type: "BID_ROOM_CANCELLED",
+          content: "This bid room has been cancelled by the buyer.",
+          link: `/dashboard/bidroom/${roomId}`,
+        });
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Room cancelled successfully",
+      });
+    } catch (err) {
+      handleError("PATCH /rooms/:id/cancel", err, res);
     }
   },
 };

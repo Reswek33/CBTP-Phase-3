@@ -42,7 +42,7 @@ router.post("/create", requireRole(["BUYER"]), bidRoomController.createRoom);
 router.post(
   "/:roomId/join",
   requireRole(["SUPPLIER", "BUYER"]),
-  bidRoomController.jointRoom,
+  bidRoomController.joinRoom,
 );
 
 // Start room (buyer action)
@@ -50,6 +50,13 @@ router.post("/:id/start", requireRole(["BUYER"]), bidRoomController.startRoom);
 
 // Award bid (buyer action)
 router.patch("/:id/award", requireRole(["BUYER"]), bidRoomController.awardBid);
+
+// Cancel room (buyer action)
+router.patch(
+  "/:id/cancel",
+  requireRole(["BUYER"]),
+  bidRoomController.cancelRoom,
+);
 
 // Place bid (supplier action)
 router.post(
