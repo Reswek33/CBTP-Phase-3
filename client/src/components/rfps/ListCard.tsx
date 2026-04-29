@@ -23,6 +23,7 @@ import {
   Send,
   X,
 } from "lucide-react";
+import { useUi } from "@/contexts/UiContext";
 
 type SortField = "budget" | "deadline" | "createdAt" | "bids";
 type SortOrder = "asc" | "desc";
@@ -130,6 +131,7 @@ const MessageModal: React.FC<{
 const ListCard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useUi();
 
   const [rfps, setRfps] = useState<RFPS[]>([]);
   const [filteredRfps, setFilteredRfps] = useState<RFPS[]>([]);
@@ -241,14 +243,14 @@ const ListCard: React.FC = () => {
         navigate(`/dashboard/chat?conversationId=${chat.id}`);
       } catch (err) {
         console.error("Failed to initialize chat", err);
-        alert("Failed to start conversation. Please try again.");
+        toast.error("Failed to start conversation. Please try again.");
       } finally {
         setIsSending(false);
         setShowMessageModal(false);
         setSelectedRfp(null);
       }
     },
-    [navigate],
+    [navigate, toast],
   );
 
   const handleCardClick = useCallback(
@@ -290,12 +292,12 @@ const ListCard: React.FC = () => {
 
   const stats = useMemo(
     () => ({
-      total: rfps.length,
-      open: rfps.filter((r) => r.status === "OPEN").length,
-      urgent: rfps.filter((r) => r.priority === "URGENT").length,
-      totalBudget: rfps.reduce((sum, r) => sum + r.budget, 0),
+      total: filteredRfps.length,
+      open: filteredRfps.filter((r) => r.status === "OPEN").length,
+      urgent: filteredRfps.filter((r) => r.priority === "URGENT").length,
+      totalBudget: filteredRfps.reduce((sum, r) => sum + Number(r.budget || 0), 0),
     }),
-    [rfps],
+    [filteredRfps],
   );
 
   const uniqueStatuses = useMemo(
@@ -374,7 +376,7 @@ const ListCard: React.FC = () => {
             <DollarSign className="w-4 h-4 text-amber-500" />
           </div>
           <p className="text-2xl font-bold text-foreground">
-            ${(stats.totalBudget / 1000).toFixed(0)}k
+            ${stats.totalBudget >= 1000 ? (stats.totalBudget / 1000).toFixed(1) + 'k' : stats.totalBudget.toLocaleString()}
           </p>
         </div>
       </div>

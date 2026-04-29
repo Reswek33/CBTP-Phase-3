@@ -250,24 +250,20 @@ export const supplierController = {
         },
       };
 
-      // Category filter
-      if (category) {
+      // Category filter or RFP-specific shortlist
+      if (rfpId) {
+        // If creating a bid room for an RFP, strictly filter for suppliers
+        // who have submitted a bid and passed technical review (status: ACTIVE)
+        whereConditions.bids = {
+          some: {
+            rfpId: rfpId as string,
+            status: "ACTIVE", // Shortlisted for bid room
+          },
+        };
+      } else if (category) {
         whereConditions.categories = {
           has: category as string,
         };
-      } else if (rfpId) {
-        // Get RFP categories to match
-        const rfp = await prisma.rfp.findUnique({
-          where: { id: rfpId as string },
-          select: { category: true },
-        });
-
-        if (rfp && rfp.category) {
-          const categories = rfp.category.split(",").map((c) => c.trim());
-          whereConditions.categories = {
-            hasSome: categories,
-          };
-        }
       }
 
       // Search filter

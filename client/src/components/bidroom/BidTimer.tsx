@@ -10,6 +10,8 @@ export const BidTimer: React.FC<BidTimerProps> = ({ endTime, onEnd }) => {
   const [timeLeft, setTimeLeft] = useState<string>("");
 
   useEffect(() => {
+    let hasCalledEnd = false;
+
     const calculateTimeLeft = () => {
       const end = new Date(endTime).getTime();
       const now = new Date().getTime();
@@ -17,7 +19,10 @@ export const BidTimer: React.FC<BidTimerProps> = ({ endTime, onEnd }) => {
 
       if (difference <= 0) {
         setTimeLeft("Ended");
-        onEnd?.();
+        if (!hasCalledEnd) {
+          onEnd?.();
+          hasCalledEnd = true;
+        }
         return;
       }
 
@@ -33,7 +38,16 @@ export const BidTimer: React.FC<BidTimerProps> = ({ endTime, onEnd }) => {
     };
 
     calculateTimeLeft();
-    const timer = setInterval(calculateTimeLeft, 1000);
+    const timer = setInterval(() => {
+      const end = new Date(endTime).getTime();
+      const now = new Date().getTime();
+      if (end - now <= 0) {
+        calculateTimeLeft();
+        clearInterval(timer);
+      } else {
+        calculateTimeLeft();
+      }
+    }, 1000);
 
     return () => clearInterval(timer);
   }, [endTime, onEnd]);

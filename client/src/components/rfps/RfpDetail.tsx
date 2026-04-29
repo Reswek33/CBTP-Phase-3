@@ -8,6 +8,7 @@ import {
   updateApplicationStatus,
 } from "../../services/api/bid-api";
 import { useAuth } from "../../contexts/AuthContext";
+import { useSocket } from "../../contexts/SocketContext";
 import {
   FileText,
   DollarSign,
@@ -41,6 +42,8 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
   const [proposalText, setProposalText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  const { socket } = useSocket();
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -60,6 +63,29 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
   useEffect(() => {
     fetchData();
   }, [rfpId]);
+
+  useEffect(() => {
+    if (!socket || !rfpId) return;
+
+    socket.emit("join_rfp", rfpId);
+
+    const handleUpdate = () => fetchData();
+
+    socket.on("new_application_received", handleUpdate);
+    socket.on("bid_status_updated", handleUpdate);
+    socket.on("rfp_status_changed", handleUpdate);
+    socket.on("rfp_cancelled", handleUpdate);
+
+    return () => {
+      socket.off("new_application_received", handleUpdate);
+      socket.off("bid_status_updated", handleUpdate);
+      socket.off("rfp_status_changed", handleUpdate);
+      socket.off("rfp_cancelled", handleUpdate);
+      if (socket.connected) {
+        socket.emit("leave_rfp", rfpId);
+      }
+    };
+  }, [socket, rfpId]);
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();

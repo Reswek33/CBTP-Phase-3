@@ -48,7 +48,7 @@ interface BuyerDashboardData {
   openRfpsCount: number;
   totalBidsReceived: number;
   activeSuppliers: number;
-  avgBidAmount: number;
+  totalBudget: number;
   recentRfps: RFPItem[];
   recentBids: BidItem[];
   upcomingDeadlines: DeadlineItem[];
@@ -420,8 +420,8 @@ export const DashboardHome = () => {
             link="/dashboard/rfps"
           />
           <StatCard
-            title="Avg. Bid Amount"
-            value={`$${data.avgBidAmount || 0}k`}
+            title="Total Budget (Active)"
+            value={`$${(data.totalBudget || 0).toLocaleString()}`}
             icon={<DollarSign className="w-5 h-5" />}
             color="amber"
             link="/dashboard/rfps"

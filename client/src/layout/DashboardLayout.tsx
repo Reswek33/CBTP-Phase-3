@@ -35,7 +35,9 @@ import {
   Target,
   BarChart3,
   HelpCircle,
+  CreditCard,
 } from "lucide-react";
+import { toast } from "sonner";
 import { ModeToggle } from "@/components/Toggle";
 
 interface NotificationItem {
@@ -66,9 +68,6 @@ export const DashboardLayout: React.FC = () => {
 
   // State Management
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
-  const [toasts, setToasts] = useState<
-    { id: number; content: string; type?: string }[]
-  >([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -107,6 +106,11 @@ export const DashboardLayout: React.FC = () => {
     }
   }, [isAuthenticated]);
 
+  const locationPathnameRef = useRef(location.pathname);
+  useEffect(() => {
+    locationPathnameRef.current = location.pathname;
+  }, [location.pathname]);
+
   // Socket listeners
   useEffect(() => {
     if (!socket) return;
@@ -119,7 +123,7 @@ export const DashboardLayout: React.FC = () => {
 
     socket.on("new_message", (message) => {
       // Only increment count if not on chat page or message is not from current user
-      if (!location.pathname.includes("/chat")) {
+      if (!locationPathnameRef.current.includes("/chat")) {
         setUnreadMessageCount((prev) => prev + 1);
         showToast(
           `New message from ${message.sender?.firstName || "Someone"}`,
@@ -155,7 +159,7 @@ export const DashboardLayout: React.FC = () => {
       socket.off("profile_sync");
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [socket, location.pathname, isAuthenticated]);
+  }, [socket, isAuthenticated]);
 
   // Refresh unread count when navigating away from chat
   useEffect(() => {
@@ -186,11 +190,9 @@ export const DashboardLayout: React.FC = () => {
   }, [isMobileMenuOpen]);
 
   const showToast = (content: string, type: string = "info") => {
-    const toastId = Date.now();
-    setToasts((prev) => [{ id: toastId, content, type }, ...prev]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== toastId));
-    }, 5000);
+    if (type === "error") toast.error(content);
+    else if (type === "success") toast.success(content);
+    else toast.info(content);
   };
 
   const handleMarkAsRead = async (id: string) => {
@@ -365,6 +367,12 @@ export const DashboardLayout: React.FC = () => {
       ],
     },
     {
+      label: "Subscription",
+      path: "/dashboard/subscription",
+      icon: <CreditCard className="w-4 h-4" />,
+      roles: ["BUYER", "SUPPLIER"],
+    },
+    {
       label: "Profile",
       path: "/dashboard/profile",
       icon: <UserCircle className="w-4 h-4" />,
@@ -378,21 +386,7 @@ export const DashboardLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Toast Container */}
-      <div className="fixed top-20 right-4 z-50 space-y-2">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`
-              bg-card border border-border rounded-lg px-4 py-3 min-w-70 shadow-lg
-              ${toast.type === "error" ? "border-destructive/50" : "border-primary/50"}
-              animate-slide-in-right
-            `}
-          >
-            <p className="text-sm text-foreground">{toast.content}</p>
-          </div>
-        ))}
-      </div>
+      {/* Toast Container - Removed in favor of Sonner */}
 
       {/* Mobile Menu Button */}
       <button

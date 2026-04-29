@@ -48,6 +48,8 @@ const UserDetailView = lazy(() =>
     default: m.UserDetailView,
   })),
 );
+const SubscriptionPage = lazy(() => import("../pages/SubscriptionPage"));
+const PaymentStatusPage = lazy(() => import("../pages/PaymentStatusPage"));
 
 // Helper for loading states - Using LissajousLoader for better UX
 const PageLoader = () => (
@@ -215,7 +217,25 @@ export const router = createBrowserRouter([
         element: <ChatPage />,
         errorElement: <ErrorPage />,
       },
+      {
+        path: "subscription",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <SubscriptionPage />
+          </Suspense>
+        ),
+        errorElement: <ErrorPage />,
+      },
     ],
+  },
+  {
+    path: "/payment-status",
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <PaymentStatusPage />
+      </Suspense>
+    ),
+    errorElement: <ErrorPage />,
   },
   {
     path: "/unauthorized",

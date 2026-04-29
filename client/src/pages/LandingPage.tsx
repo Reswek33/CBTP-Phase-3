@@ -101,6 +101,12 @@ export const LandingPage: React.FC = () => {
             >
               For Suppliers
             </button>
+            <button
+              onClick={() => scrollToSection("pricing")}
+              className="text-sm font-semibold text-muted-foreground hover:text-primary transition-colors"
+            >
+              Pricing
+            </button>
             <div className="flex items-center space-x-4 pl-4 border-l border-border">
               <Link
                 to="/login"
@@ -176,6 +182,12 @@ export const LandingPage: React.FC = () => {
                   className="w-full text-left text-2xl font-bold text-foreground hover:text-primary transition-colors py-3"
                 >
                   For Providers
+                </button>
+                <button
+                  onClick={() => scrollToSection("pricing")}
+                  className="w-full text-left text-2xl font-bold text-foreground hover:text-primary transition-colors py-3"
+                >
+                  Pricing
                 </button>
 
                 <div className="pt-8 space-y-4 border-t border-border">
@@ -477,6 +489,86 @@ export const LandingPage: React.FC = () => {
               </div>
               <div className="absolute bottom-[-20%] right-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform"></div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section - Subscription Plans */}
+      <section id="pricing" className="py-24 sm:py-32 bg-muted/50 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-sm font-black text-primary uppercase tracking-[0.3em] mb-4">
+              Subscription
+            </h2>
+            <p className="text-3xl sm:text-5xl font-bold text-foreground tracking-tight">
+              Flexible Plans for Every Business
+            </p>
+            <p className="text-muted-foreground mt-4 max-w-2xl mx-auto font-medium">
+              Choose the perfect tier to supercharge your procurement or sales pipeline.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              {
+                name: "Basic",
+                price: "500",
+                desc: "Essential tools for small businesses.",
+                features: ["Up to 5 active bids", "Basic RFP filters", "Email notifications"],
+                color: "bg-blue-500/10 border-blue-500/20"
+              },
+              {
+                name: "Professional",
+                price: "1,500",
+                desc: "Advanced features for growing companies.",
+                features: ["Unlimited active bids", "Priority Bid Rooms", "Advanced analytics", "SMS notifications"],
+                popular: true,
+                color: "bg-primary/10 border-primary/20"
+              },
+              {
+                name: "Enterprise",
+                price: "5,000",
+                desc: "Customized solutions for large organizations.",
+                features: ["Dedicated manager", "Custom integrations", "Bulk RFP tools", "24/7 Phone support"],
+                color: "bg-purple-500/10 border-purple-500/20"
+              }
+            ].map((plan, i) => (
+              <div
+                key={i}
+                className={`relative p-8 rounded-[32px] border bg-card transition-all hover:shadow-2xl ${plan.popular ? 'border-primary shadow-xl scale-105 z-10' : 'border-border'}`}
+              >
+                {plan.popular && (
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                    Most Popular
+                  </div>
+                )}
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 ${plan.color}`}>
+                  <Zap className={`w-6 h-6 ${plan.popular ? 'text-primary' : 'text-muted-foreground'}`} />
+                </div>
+                <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
+                <p className="text-sm text-muted-foreground mb-6 font-medium">{plan.desc}</p>
+                <div className="flex items-baseline gap-1 mb-8">
+                  <span className="text-4xl font-black">{plan.price}</span>
+                  <span className="text-muted-foreground font-bold">ETB/mo</span>
+                </div>
+                <div className="space-y-4 mb-10">
+                  {plan.features.map((feat, j) => (
+                    <div key={j} className="flex items-center gap-3 text-sm font-medium">
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Check className="w-3 h-3 text-primary" />
+                      </div>
+                      <span>{feat}</span>
+                    </div>
+                  ))}
+                </div>
+                <Link
+                  to="/register"
+                  className={`w-full py-4 rounded-2xl font-bold transition-all text-center block ${plan.popular ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20' : 'bg-muted text-foreground hover:bg-muted/80'}`}
+                >
+                  Start with {plan.name}
+                </Link>
+              </div>
+            ))}
           </div>
         </div>
       </section>

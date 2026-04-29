@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getMyInvitations, getMyRooms } from "@/services/api/bidroom-api";
 import { Plus, Inbox, Clock, Trophy, Mail } from "lucide-react";
@@ -13,7 +13,7 @@ export const BidRoomList: React.FC = () => {
 
   const isBuyer = user?.role === "BUYER";
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       // Logic: If Buyer, get rooms they created. If Supplier, get invitations.
@@ -23,10 +23,10 @@ export const BidRoomList: React.FC = () => {
       // We wrap the Buyer's rooms to match that structure so the card component works for both.
       const normalizedData = isBuyer
         ? response.data.map((room: any) => ({
-            id: room.id,
-            status: "ACCEPTED",
-            bidRoom: room,
-          }))
+          id: room.id,
+          status: "ACCEPTED",
+          bidRoom: room,
+        }))
         : response.data;
 
       setData(normalizedData);
@@ -35,11 +35,11 @@ export const BidRoomList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isBuyer]);
 
   useEffect(() => {
     fetchData();
-  }, [isBuyer]);
+  }, [fetchData]);
 
   if (loading) {
     return (

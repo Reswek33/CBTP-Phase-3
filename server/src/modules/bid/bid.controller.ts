@@ -470,6 +470,8 @@ export const bidController = {
 
       // Tell the supplier UI to unlock the financial input
       io.to(bid.supplierId).emit("bid_status_updated", { bidId, status });
+      // Tell everyone viewing the RFP page about the status update
+      io.to(bid.rfpId).emit("bid_status_updated", { bidId, status });
 
       return res.status(200).json({ success: true, data: bid });
     } catch (error) {

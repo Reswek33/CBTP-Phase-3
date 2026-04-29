@@ -7,13 +7,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   getRoomDetail,
   updateBidAmount,
-  awardBidById,
   joinRoom,
   startRoom,
 } from "@/services/api/bidroom-api";
 import { BidTimer } from "./BidTimer";
 import { BidHistory } from "./BidHistory";
 import { BidInput } from "./BidInput";
+import { useCallback } from "react";
 import {
   ArrowLeft,
   Trophy,
@@ -34,37 +34,36 @@ export const BidRoomDetail: React.FC = () => {
   const [room, setRoom] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [hasJoined, setHasJoined] = useState(false);
+  const hasJoinedRef = React.useRef(false);
 
   const isBuyer = user?.role === "BUYER";
   const isSupplier = user?.role === "SUPPLIER";
 
-  const fetchRoom = async () => {
+  const fetchRoom = useCallback(async () => {
     try {
       setLoading(true);
       const response = await getRoomDetail(id!);
-      // console.log("room detail: ", response.data);
       setRoom(response.data);
     } catch (error) {
       console.error("Failed to load room:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchRoom();
-  }, [id]);
+  }, [fetchRoom]);
 
   useEffect(() => {
     // Only attempt to join and setup sockets if we have a connection and room ID
     if (!socket || !id) return;
 
     const performJoin = async () => {
-      if (hasJoined || !socket.connected || !socket.id) return;
+      if (hasJoinedRef.current || !socket.connected || !socket.id) return;
       try {
         await joinRoom(id!, socket.id);
-        setHasJoined(true);
+        hasJoinedRef.current = true;
       } catch (error) {
         console.error("Failed to join room participant list:", error);
       }
@@ -109,11 +108,14 @@ export const BidRoomDetail: React.FC = () => {
       socket.off("room_started");
       socket.off("room_cancelled");
       socket.off("invitation_updated");
+      if (socket.connected) {
+        socket.emit("leave_bid_room", id);
+      }
     };
-  }, [socket, id, hasJoined]);
+  }, [socket, id]);
 
   useEffect(() => {
-    setHasJoined(false);
+    hasJoinedRef.current = false;
   }, [id]);
 
   const handlePlaceBid = async (amount: number) => {

@@ -93,7 +93,10 @@ export const chatController = {
       // 3. REAL-TIME EMIT
       try {
         const io = getIO();
-        io.to(conversationId).emit("new_message", message);
+        io.to(conversationId)
+          .to(conversation.buyerId)
+          .to(conversation.supplierId)
+          .emit("new_message", message);
       } catch (socketErr) {
         console.warn("[SOCKET_EMIT_FAILED]", socketErr);
         // We don't fail the request because the DB write succeeded
@@ -267,11 +270,16 @@ export const chatController = {
 
       const unreadCount = updatedConversation?.messages.length || 0;
       const io = getIO();
-      io.to(conversationId).emit("messages_read", {
-        conversationId,
-        userId,
-        unreadCount,
-      });
+      if (updatedConversation) {
+        io.to(conversationId)
+          .to(updatedConversation.buyerId)
+          .to(updatedConversation.supplierId)
+          .emit("messages_read", {
+            conversationId,
+            userId,
+            unreadCount,
+          });
+      }
 
       res.json({
         success: true,

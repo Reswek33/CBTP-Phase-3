@@ -50,6 +50,11 @@ export const initSocket = (server: HttpServer) => {
       console.log(`User joined rfp room: ${rfpId}`);
     });
 
+    socket.on("leave_rfp", (rfpId: string) => {
+      socket.leave(rfpId);
+      console.log(`User left rfp room: ${rfpId}`);
+    });
+
     socket.on("join_bid_room", (bidRoomId: string) => {
       const roomName = `room_${bidRoomId}`;
       socket.join(roomName);

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from "react";
 import { updateInvitationStatus } from "@/services/api/bidroom-api";
+import { useUi } from "@/contexts/UiContext";
 import { CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
 
 interface Invitation {
@@ -29,6 +30,7 @@ export const InvitationsList: React.FC<InvitationsListProps> = ({
   onUpdate,
 }) => {
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const { toast } = useUi();
 
   const handleUpdateStatus = async (
     invitationId: string,
@@ -39,7 +41,7 @@ export const InvitationsList: React.FC<InvitationsListProps> = ({
       await updateInvitationStatus(invitationId, status);
       onUpdate();
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to update invitation");
+      toast.error(error.response?.data?.message || "Failed to update invitation");
     } finally {
       setProcessingId(null);
     }
