@@ -6,6 +6,7 @@ import { getRfpsById } from "../../services/api/rfp-api";
 import {
   applyToBid,
   updateApplicationStatus,
+  evaluateTechnicalBid,
 } from "../../services/api/bid-api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSocket } from "../../contexts/SocketContext";
@@ -18,12 +19,14 @@ import {
   Clock,
   Upload,
   File,
+  X,
   Eye,
   UserCheck,
   UserX,
   Download,
   Send,
   Users,
+  Shield,
 } from "lucide-react";
 
 const getFileUrl = (filePath: string) => {
@@ -41,8 +44,15 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
   // Document states
   const [proposalText, setProposalText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [amount, setAmount] = useState<number>(0);
+  
+  // Evaluation States
+  const [evaluatingBid, setEvaluatingBid] = useState<any>(null);
+  const [technicalScore, setTechnicalScore] = useState(0);
+  const [evalStatus, setEvalStatus] = useState<"QUALIFIED" | "DISQUALIFIED">("QUALIFIED");
+  const [rejectionReason, setRejectionReason] = useState("");
 
-  const { socket } = useSocket();
+  const socket = useSocket();
 
   const fetchData = async () => {
     try {
@@ -94,6 +104,7 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
     try {
       const formData = new FormData();
       formData.append("proposal", proposalText);
+      formData.append("amount", amount.toString());
       formData.append("proposalFile", selectedFile);
       await applyToBid(rfpId, formData);
       alert("Application submitted! Wait for technical approval.");
@@ -120,6 +131,27 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
       fetchData();
     } catch (err) {
       alert("Status update failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleTechnicalEvaluation = async () => {
+    if (!evaluatingBid) return;
+    setSubmitting(true);
+    try {
+      await evaluateTechnicalBid(evaluatingBid.id, {
+        status: evalStatus,
+        score: technicalScore,
+        rejectionReason:
+          evalStatus === "DISQUALIFIED" ? rejectionReason : undefined,
+      });
+      alert(`Bid ${evalStatus.toLowerCase()} successfully!`);
+      setEvaluatingBid(null);
+      fetchData();
+    } catch (err) {
+      console.error("Evaluation error:", err);
+      alert("Failed to evaluate bid");
     } finally {
       setSubmitting(false);
     }
@@ -203,6 +235,30 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                   onChange={(e) => setProposalText(e.target.value)}
                   className="w-full p-4 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none min-h-[120px]"
                 />
+
+                <div>
+                  <label className="block text-xs font-mono text-muted-foreground mb-2">
+                    Financial Bid Amount ({rfp.currency})
+                  </label>
+                  <div className="relative max-w-xs">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="number"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) =>
+                        setAmount(parseFloat(e.target.value) || 0)
+                      }
+                      className="w-full pl-10 pr-4 py-3 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none font-bold"
+                    />
+                  </div>
+                  {rfp.workflow === "TWO_ENVELOPE" && (
+                    <p className="text-[10px] text-amber-600 mt-2 flex items-center gap-1 font-medium">
+                      <Shield className="w-3 h-3" /> Two-Envelope System: Your
+                      financial bid remains locked until technical qualification.
+                    </p>
+                  )}
+                </div>
                 <div className="flex items-center gap-4">
                   <label className="flex-1 cursor-pointer border-2 border-dashed border-border p-4 rounded-xl hover:bg-muted/50 transition-colors text-center">
                     <input
@@ -292,35 +348,66 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                       "{bid.proposal}"
                     </p>
 
-                    <div className="flex items-center gap-2 mt-auto">
-                      <a
-                        href={getFileUrl(bid.proposalPath)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-muted hover:bg-border rounded-lg text-xs font-bold transition-colors"
-                      >
-                        <Eye className="w-3 h-3" /> View Proposal
-                      </a>
+                    <div className="flex flex-col gap-2 mt-auto">
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={getFileUrl(bid.proposalPath)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-1 flex items-center justify-center gap-2 py-2 bg-muted hover:bg-border rounded-lg text-xs font-bold transition-colors"
+                        >
+                          <Eye className="w-3 h-3" /> View Proposal
+                        </a>
 
-                      {bid.status === "PENDING_APPROVAL" && (
-                        <>
-                          <button
-                            onClick={() => handleStatusUpdate(bid.id, "ACTIVE")}
-                            className="p-2 bg-green-500/10 text-green-600 rounded-lg hover:bg-green-500/20"
-                            title="Shortlist for Bid Room"
-                          >
-                            <UserCheck className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleStatusUpdate(bid.id, "REJECTED")
-                            }
-                            className="p-2 bg-red-500/10 text-red-600 rounded-lg hover:bg-red-500/20"
-                            title="Reject Proposal"
-                          >
-                            <UserX className="w-4 h-4" />
-                          </button>
-                        </>
+                        {bid.status === "PENDING_APPROVAL" && rfp.workflow !== "TWO_ENVELOPE" && (
+                          <>
+                            <button
+                              onClick={() => handleStatusUpdate(bid.id, "ACTIVE")}
+                              className="p-2 bg-green-500/10 text-green-600 rounded-lg hover:bg-green-500/20"
+                              title="Shortlist for Bid Room"
+                            >
+                              <UserCheck className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleStatusUpdate(bid.id, "REJECTED")
+                              }
+                              className="p-2 bg-red-500/10 text-red-600 rounded-lg hover:bg-red-500/20"
+                              title="Reject Proposal"
+                            >
+                              <UserX className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      {rfp.workflow === "TWO_ENVELOPE" && bid.technicalStatus === "PENDING" && (
+                        <button
+                          onClick={() => setEvaluatingBid(bid)}
+                          className="w-full flex items-center justify-center gap-2 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors"
+                        >
+                          <Shield className="w-3 h-3" /> Score & Evaluate Technical Proposal
+                        </button>
+                      )}
+
+                      {bid.technicalStatus !== "PENDING" && (
+                        <div className={`text-center py-1.5 rounded-lg text-[10px] font-bold uppercase ${
+                          bid.technicalStatus === "QUALIFIED" ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
+                        }`}>
+                          Technical: {bid.technicalStatus} ({bid.technicalScore}/100)
+                        </div>
+                      )}
+                      
+                      {bid.technicalStatus === "QUALIFIED" && !bid.amount && (
+                         <div className="text-center py-1 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+                            WAITING FOR FINANCIAL SUBMISSION
+                         </div>
+                      )}
+                      
+                      {bid.amount && (
+                         <div className="text-center py-1 rounded bg-green-100 text-green-800 text-sm font-bold flex items-center justify-center gap-1">
+                            <DollarSign className="w-3 h-3" /> {bid.amount} {rfp.currency}
+                         </div>
                       )}
                     </div>
                   </div>
@@ -371,6 +458,109 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
           )}
         </div>
       </div>
+
+      {/* Evaluation Modal */}
+      {evaluatingBid && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border bg-muted/30">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" /> Technical Evaluation
+                </h3>
+                <button
+                  onClick={() => setEvaluatingBid(null)}
+                  className="p-2 hover:bg-muted rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Evaluating bid for: {evaluatingBid.supplier?.businessName}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Technical Score (0-100)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={technicalScore}
+                  onChange={(e) =>
+                    setTechnicalScore(parseInt(e.target.value) || 0)
+                  }
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none text-xl font-bold text-center"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-3">
+                  Qualification Status
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setEvalStatus("QUALIFIED")}
+                    className={`py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+                      evalStatus === "QUALIFIED"
+                        ? "bg-green-500 text-white shadow-lg shadow-green-500/20"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    <CheckCircle className="w-4 h-4" /> Qualified
+                  </button>
+                  <button
+                    onClick={() => setEvalStatus("DISQUALIFIED")}
+                    className={`py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+                      evalStatus === "DISQUALIFIED"
+                        ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    <UserX className="w-4 h-4" /> Disqualified
+                  </button>
+                </div>
+              </div>
+
+              {evalStatus === "DISQUALIFIED" && (
+                <div className="animate-in slide-in-from-top-2 duration-200">
+                  <label className="block text-sm font-medium mb-2 text-red-500">
+                    Reason for Disqualification
+                  </label>
+                  <textarea
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    className="w-full px-4 py-3 bg-background border border-red-500/30 rounded-xl focus:ring-2 focus:ring-red-500 outline-none min-h-[100px]"
+                    placeholder="Provide details on why the technical proposal failed..."
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 bg-muted/30 flex gap-3">
+              <button
+                onClick={() => setEvaluatingBid(null)}
+                className="flex-1 py-3 border border-border rounded-xl font-bold hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleTechnicalEvaluation}
+                disabled={
+                  submitting ||
+                  (evalStatus === "DISQUALIFIED" && !rejectionReason)
+                }
+                className="flex-[2] py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20"
+              >
+                {submitting ? "Processing..." : "Submit Evaluation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

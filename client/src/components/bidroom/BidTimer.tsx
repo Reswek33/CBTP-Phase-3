@@ -8,9 +8,11 @@ interface BidTimerProps {
 
 export const BidTimer: React.FC<BidTimerProps> = ({ endTime, onEnd }) => {
   const [timeLeft, setTimeLeft] = useState<string>("");
+  const hasCalledEnd = React.useRef(false);
 
   useEffect(() => {
-    let hasCalledEnd = false;
+    // Reset when endTime changes
+    hasCalledEnd.current = false;
 
     const calculateTimeLeft = () => {
       const end = new Date(endTime).getTime();
@@ -19,9 +21,9 @@ export const BidTimer: React.FC<BidTimerProps> = ({ endTime, onEnd }) => {
 
       if (difference <= 0) {
         setTimeLeft("Ended");
-        if (!hasCalledEnd) {
+        if (!hasCalledEnd.current) {
           onEnd?.();
-          hasCalledEnd = true;
+          hasCalledEnd.current = true;
         }
         return;
       }

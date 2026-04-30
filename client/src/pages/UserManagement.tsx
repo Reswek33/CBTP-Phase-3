@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getAllUsers } from "../services/api/admin-api";
+import { getAllUsers, createAdmin } from "../services/api/admin-api";
+import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 import type { User } from "@/schemas/auth-schema";
 import {
@@ -16,14 +17,28 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Plus,
+  X,
+  Lock,
 } from "lucide-react";
+import { toast } from "sonner";
 
 export const UserManagement = () => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newAdmin, setNewAdmin] = useState({
+    firstName: "",
+    lastName: "",
+    username: "",
+    email: "",
+    password: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const itemsPerPage = 10;
 
   const loadData = async () => {
@@ -149,26 +164,26 @@ export const UserManagement = () => {
     currentPage * itemsPerPage,
   );
   const pendingSuppliers = users.filter(
-    (u) => u.role === "SUPPLIER" && u.supplier?.status === "PENDING",
+    (u: User) => u.role === "SUPPLIER" && u.supplier?.status === "PENDING",
   ).length;
 
   const pendingBuyers = users.filter(
-    (u) => u.role === "BUYER" && u.buyer?.status === "PENDING",
+    (u: User) => u.role === "BUYER" && u.buyer?.status === "PENDING",
   ).length;
 
   const verifiedSuppliers = users.filter(
-    (u) => u.role === "SUPPLIER" && u.supplier?.status === "VERIFIED",
+    (u: User) => u.role === "SUPPLIER" && u.supplier?.status === "VERIFIED",
   ).length;
 
   const verifiedBuyers = users.filter(
-    (u) => u.role === "BUYER" && u.buyer?.status === "VERIFIED",
+    (u: User) => u.role === "BUYER" && u.buyer?.status === "VERIFIED",
   ).length;
 
   const stats = {
     total: users.length,
-    suppliers: users.filter((u) => u.role === "SUPPLIER").length,
-    buyers: users.filter((u) => u.role === "BUYER").length,
-    admins: users.filter((u) => u.role === "ADMIN" || u.role === "SUPERADMIN")
+    suppliers: users.filter((u: User) => u.role === "SUPPLIER").length,
+    buyers: users.filter((u: User) => u.role === "BUYER").length,
+    admins: users.filter((u: User) => u.role === "ADMIN" || u.role === "SUPERADMIN")
       .length,
     pending: pendingBuyers + pendingSuppliers,
     verified: verifiedBuyers + verifiedSuppliers,
@@ -187,6 +202,144 @@ export const UserManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-3">
+            <Users className="text-primary w-8 h-8" />
+            User Management
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Audit and manage system access for all participants
+          </p>
+        </div>
+
+        {currentUser?.role === "SUPERADMIN" && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20"
+          >
+            <Plus className="w-5 h-5" />
+            Add New Admin
+          </button>
+        )}
+      </div>
+
+      {/* Admin Creation Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card border border-border w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border flex items-center justify-between bg-muted/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Register New Admin</h3>
+                  <p className="text-xs text-muted-foreground">Grant system-wide administrative access</p>
+                </div>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-muted rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setIsSubmitting(true);
+              try {
+                const res = await createAdmin(newAdmin);
+                if (res.success) {
+                  toast.success(`Admin ${newAdmin.username} created successfully`);
+                  setIsModalOpen(false);
+                  setNewAdmin({ firstName: "", lastName: "", username: "", email: "", password: "" });
+                  loadData();
+                }
+              } catch (err: any) {
+                toast.error(err.response?.data?.message || "Failed to create admin");
+              } finally {
+                setIsSubmitting(false);
+              }
+            }} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-muted-foreground uppercase">First Name</label>
+                  <input
+                    required
+                    type="text"
+                    value={newAdmin.firstName}
+                    onChange={(e) => setNewAdmin({ ...newAdmin, firstName: e.target.value })}
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-muted-foreground uppercase">Last Name</label>
+                  <input
+                    required
+                    type="text"
+                    value={newAdmin.lastName}
+                    onChange={(e) => setNewAdmin({ ...newAdmin, lastName: e.target.value })}
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono text-muted-foreground uppercase">Username</label>
+                <input
+                  required
+                  type="text"
+                  value={newAdmin.username}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, username: e.target.value })}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono text-muted-foreground uppercase">Email Address</label>
+                <input
+                  required
+                  type="email"
+                  value={newAdmin.email}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono text-muted-foreground uppercase">Initial Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    required
+                    type="password"
+                    value={newAdmin.password}
+                    onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+                    className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg font-medium transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={isSubmitting}
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-bold hover:opacity-90 transition-all disabled:opacity-50"
+                >
+                  {isSubmitting ? "Creating..." : "Create Admin Account"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {/* Header Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <div className="bg-card border border-border rounded-xl p-4">
@@ -462,11 +615,10 @@ export const UserManagement = () => {
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                        currentPage === pageNum
+                      className={`px-3 py-1 rounded-lg text-sm transition-colors ${currentPage === pageNum
                           ? "bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:bg-muted"
-                      }`}
+                        }`}
                     >
                       {pageNum}
                     </button>
@@ -489,3 +641,5 @@ export const UserManagement = () => {
     </div>
   );
 };
+
+export default UserManagement;

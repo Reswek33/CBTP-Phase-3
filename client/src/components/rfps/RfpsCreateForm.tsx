@@ -20,6 +20,7 @@ import {
   File,
   Clock,
   AlertTriangle,
+  Shield,
 } from "lucide-react";
 
 const RfpPriority = ["NORMAL", "HIGH", "URGENT"] as const;
@@ -50,10 +51,12 @@ const RfpsCreateForm: React.FC = () => {
       deadline: new Date(),
       priority: "NORMAL",
       status: "OPEN",
+      workflow: "STANDARD",
     },
   });
 
   const watchPriority = watch("priority");
+  const watchWorkflow = watch("workflow");
 
   const onSubmit = async (data: CreateRfpsInput) => {
     setIsSubmitting(true);
@@ -310,6 +313,89 @@ const RfpsCreateForm: React.FC = () => {
                 </div>
               </label>
             ))}
+          </div>
+        </div>
+        
+        {/* Bidding Workflow */}
+        <div className="bg-muted/30 border border-border rounded-xl p-6">
+          <label className="block text-xs font-mono text-muted-foreground uppercase mb-4">
+            Bidding Workflow & Evaluation System
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label
+              className={`
+                relative flex cursor-pointer rounded-xl p-4 border-2 transition-all
+                ${
+                  watchWorkflow === "STANDARD"
+                    ? "border-primary bg-primary/5 ring-4 ring-primary/10"
+                    : "border-border bg-background hover:border-muted-foreground/30"
+                }
+              `}
+            >
+              <input
+                type="radio"
+                value="STANDARD"
+                {...register("workflow")}
+                className="sr-only"
+              />
+              <div className="flex gap-4">
+                <div
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                    watchWorkflow === "STANDARD"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">Standard Bidding</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                    Technical and Financial bids are evaluated simultaneously.
+                    Best for simple procurement with fixed specifications.
+                  </p>
+                </div>
+              </div>
+            </label>
+
+            <label
+              className={`
+                relative flex cursor-pointer rounded-xl p-4 border-2 transition-all
+                ${
+                  watchWorkflow === "TWO_ENVELOPE"
+                    ? "border-primary bg-primary/5 ring-4 ring-primary/10"
+                    : "border-border bg-background hover:border-muted-foreground/30"
+                }
+              `}
+            >
+              <input
+                type="radio"
+                value="TWO_ENVELOPE"
+                {...register("workflow")}
+                className="sr-only"
+              />
+              <div className="flex gap-4">
+                <div
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                    watchWorkflow === "TWO_ENVELOPE"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <Shield className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">
+                    Two-Envelope System
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                    Technical proposals are scored first. Financial bids are locked
+                    and only revealed for qualified suppliers. Recommended for
+                    complex services.
+                  </p>
+                </div>
+              </div>
+            </label>
           </div>
         </div>
 

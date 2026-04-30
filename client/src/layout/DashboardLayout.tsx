@@ -36,6 +36,11 @@ import {
   BarChart3,
   HelpCircle,
   CreditCard,
+  DollarSign,
+  Zap,
+  ShieldAlert,
+  BarChart,
+  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ModeToggle } from "@/components/Toggle";
@@ -139,7 +144,7 @@ export const DashboardLayout: React.FC = () => {
 
     socket.on("profile_sync", (data) => {
       showToast(`Profile sync: ${data.status}`, "success");
-      getMe().catch(() => {});
+      getMe().catch(() => { });
     });
 
     // Refresh unread count when coming back to dashboard
@@ -297,29 +302,29 @@ export const DashboardLayout: React.FC = () => {
       subItems:
         role === "BUYER"
           ? [
-              {
-                label: "My RFPs",
-                path: "/dashboard/rfps",
-                icon: <FileText className="w-3 h-3" />,
-              },
-              {
-                label: "Create New",
-                path: "/dashboard/rfps/create",
-                icon: <FileText className="w-3 h-3" />,
-              },
-            ]
+            {
+              label: "My RFPs",
+              path: "/dashboard/rfps",
+              icon: <FileText className="w-3 h-3" />,
+            },
+            {
+              label: "Create New",
+              path: "/dashboard/rfps/create",
+              icon: <FileText className="w-3 h-3" />,
+            },
+          ]
           : [
-              {
-                label: "Browse RFPs",
-                path: "/dashboard/rfps",
-                icon: <Target className="w-3 h-3" />,
-              },
-              {
-                label: "My Bids",
-                path: "/dashboard/my-bids",
-                icon: <Award className="w-3 h-3" />,
-              },
-            ],
+            {
+              label: "Browse RFPs",
+              path: "/dashboard/rfps",
+              icon: <Target className="w-3 h-3" />,
+            },
+            {
+              label: "My Bids",
+              path: "/dashboard/my-bids",
+              icon: <Award className="w-3 h-3" />,
+            },
+          ],
     },
     {
       label: "Messages",
@@ -344,27 +349,52 @@ export const DashboardLayout: React.FC = () => {
       roles: ["BUYER", "SUPPLIER", "ADMIN"],
     },
     {
-      label: "Admin",
-      path: "/dashboard/admin",
-      icon: <Shield className="w-4 h-4" />,
+      label: "User Directory",
+      path: "/dashboard/admin/users",
+      icon: <Users className="w-4 h-4" />,
       roles: ["ADMIN", "SUPERADMIN"],
-      subItems: [
-        {
-          label: "User Directory",
-          path: "/dashboard/admin/users",
-          icon: <Users className="w-3 h-3" />,
-        },
-        {
-          label: "System Audit",
-          path: "/dashboard/admin/logs",
-          icon: <Activity className="w-3 h-3" />,
-        },
-        {
-          label: "Audit Trail",
-          path: "/dashboard/admin/audit",
-          icon: <BarChart3 className="w-3 h-3" />,
-        },
-      ],
+    },
+    {
+      label: "System Audit",
+      path: "/dashboard/admin/logs",
+      icon: <Activity className="w-4 h-4" />,
+      roles: ["ADMIN", "SUPERADMIN"],
+    },
+    {
+      label: "Analytics",
+      path: "/dashboard/admin/analytics",
+      icon: <BarChart3 className="w-4 h-4" />,
+      roles: ["ADMIN", "SUPERADMIN"],
+    },
+    {
+      label: "Disputes",
+      path: "/dashboard/admin/disputes",
+      icon: <ShieldAlert className="w-4 h-4" />,
+      roles: ["ADMIN", "SUPERADMIN"],
+    },
+    {
+      label: "Audit Trail",
+      path: "/dashboard/admin/audit",
+      icon: <BarChart3 className="w-4 h-4" />,
+      roles: ["ADMIN", "SUPERADMIN"],
+    },
+    {
+      label: "Subscriptions",
+      path: "/dashboard/admin/subscriptions",
+      icon: <Zap className="w-4 h-4" />,
+      roles: ["ADMIN", "SUPERADMIN"],
+    },
+    {
+      label: "Transactions",
+      path: "/dashboard/admin/transactions",
+      icon: <DollarSign className="w-4 h-4" />,
+      roles: ["ADMIN", "SUPERADMIN"],
+    },
+    {
+      label: "System Settings",
+      path: "/dashboard/admin/settings",
+      icon: <Settings className="w-4 h-4" />,
+      roles: ["ADMIN", "SUPERADMIN"],
     },
     {
       label: "Subscription",
@@ -376,6 +406,12 @@ export const DashboardLayout: React.FC = () => {
       label: "Profile",
       path: "/dashboard/profile",
       icon: <UserCircle className="w-4 h-4" />,
+      roles: ["BUYER", "SUPPLIER", "ADMIN", "SUPERADMIN"],
+    },
+    {
+      label: "Help Center",
+      path: "/dashboard/help",
+      icon: <HelpCircle className="w-4 h-4" />,
       roles: ["BUYER", "SUPPLIER", "ADMIN", "SUPERADMIN"],
     },
   ];
@@ -439,11 +475,10 @@ export const DashboardLayout: React.FC = () => {
                     className={`
                       w-full flex items-center justify-between px-3 py-2.5 rounded-lg
                       transition-all duration-200 group
-                      ${
-                        location.pathname === item.path ||
+                      ${location.pathname === item.path ||
                         location.pathname.startsWith(item.path + "/")
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
-                          : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
+                        : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
                       }
                     `}
                   >
@@ -460,9 +495,8 @@ export const DashboardLayout: React.FC = () => {
                       )}
                     </div>
                     <ChevronRight
-                      className={`w-4 h-4 transition-transform duration-200 ${
-                        expandedMenus.includes(item.path) ? "rotate-90" : ""
-                      }`}
+                      className={`w-4 h-4 transition-transform duration-200 ${expandedMenus.includes(item.path) ? "rotate-90" : ""
+                        }`}
                     />
                   </button>
                   {expandedMenus.includes(item.path) && (
@@ -475,10 +509,9 @@ export const DashboardLayout: React.FC = () => {
                           className={`
                             flex items-center space-x-3 px-3 py-2 rounded-lg
                             transition-all duration-200
-                            ${
-                              location.pathname === subItem.path
-                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                            ${location.pathname === subItem.path
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                              : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
                             }
                           `}
                         >
@@ -496,10 +529,9 @@ export const DashboardLayout: React.FC = () => {
                   className={`
                     flex items-center space-x-3 px-3 py-2.5 rounded-lg
                     transition-all duration-200 group
-                    ${
-                      location.pathname === item.path
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
-                        : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    ${location.pathname === item.path
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
+                      : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
                     }
                   `}
                 >
@@ -568,7 +600,9 @@ export const DashboardLayout: React.FC = () => {
             <div className="flex items-center space-x-4 ml-auto lg:ml-0">
               {/* Help Button */}
               <button className="p-2 bg-card border border-border rounded-lg hover:bg-accent transition-colors">
-                <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                <Link to="/dashboard/help">
+                  <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                </Link>
               </button>
 
               {/* Theme Toggle */}
@@ -637,112 +671,53 @@ export const DashboardLayout: React.FC = () => {
                         notifications.map((notif) => (
                           <div
                             key={notif.id}
-                            onClick={() =>
-                              !notif.isRead && handleMarkAsRead(notif.id)
-                            }
                             className={`
                               relative transition-all duration-200 cursor-pointer
-                              ${
-                                !notif.isRead
-                                  ? "bg-primary/5 hover:bg-primary/10 border-l-4 border-primary"
-                                  : "hover:bg-accent/50 opacity-75"
+                              ${!notif.isRead
+                                ? "bg-primary/5 hover:bg-primary/10 border-l-4 border-primary"
+                                : "hover:bg-accent/50 opacity-75"
                               }
                             `}
                           >
-                            {/* Unread indicator dot */}
-                            {!notif.isRead && (
-                              <div className="absolute top-4 left-3 w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                            )}
-
-                            <div
-                              className={`p-4 ${!notif.isRead ? "pl-8" : "pl-4"}`}
-                            >
-                              {notif.link ? (
-                                <Link
-                                  to={notif.link}
-                                  onClick={() => setShowNotifications(false)}
-                                  className="block"
-                                >
-                                  <div className="flex items-start gap-3">
-                                    <div className="shrink-0">
-                                      {!notif.isRead ? (
-                                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                          <Bell className="w-4 h-4 text-primary" />
-                                        </div>
-                                      ) : (
-                                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                                          <Bell className="w-4 h-4 text-muted-foreground" />
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p
-                                        className={`
-                                          text-sm leading-relaxed
-                                          ${!notif.isRead ? "text-popover-foreground font-medium" : "text-muted-foreground"}
-                                        `}
-                                      >
-                                        {notif.content}
-                                      </p>
-                                      <div className="flex items-center gap-2 mt-1.5">
-                                        <p className="text-xs text-muted-foreground">
-                                          {new Date(
-                                            notif.createdAt,
-                                          ).toLocaleString()}
-                                        </p>
-                                        {!notif.isRead && (
-                                          <span className="text-[9px] font-mono bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">
-                                            NEW
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </Link>
-                              ) : (
-                                <div className="flex items-start gap-3">
-                                  <div className="shrink-0">
-                                    {!notif.isRead ? (
-                                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                        <Bell className="w-4 h-4 text-primary" />
-                                      </div>
-                                    ) : (
-                                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                                        <Bell className="w-4 h-4 text-muted-foreground" />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p
-                                      className={`
-                                        text-sm leading-relaxed
-                                        ${!notif.isRead ? "text-popover-foreground font-medium" : "text-muted-foreground"}
-                                      `}
-                                    >
-                                      {notif.content}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                      <p className="text-xs text-muted-foreground">
-                                        {new Date(
-                                          notif.createdAt,
-                                        ).toLocaleString()}
-                                      </p>
-                                      {!notif.isRead && (
-                                        <span className="text-[9px] font-mono bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">
-                                          NEW
-                                        </span>
-                                      )}
-                                    </div>
+                            <div className="group relative">
+                              <Link
+                                to={notif.link || "#"}
+                                onClick={() => {
+                                  setShowNotifications(false);
+                                  if (!notif.isRead) handleMarkAsRead(notif.id);
+                                }}
+                                className={`
+                                  flex items-start gap-4 p-4 transition-all duration-300
+                                  ${!notif.isRead ? "bg-primary/5" : "hover:bg-accent"}
+                                `}
+                              >
+                                <div className="shrink-0">
+                                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${!notif.isRead ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-muted text-muted-foreground"}`}>
+                                    <Bell className="w-5 h-5" />
                                   </div>
                                 </div>
-                              )}
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm leading-relaxed ${!notif.isRead ? "text-foreground font-bold" : "text-muted-foreground"}`}>
+                                    {notif.content}
+                                  </p>
+                                  <div className="flex items-center justify-between mt-3">
+                                    <p className="text-[10px] font-mono text-muted-foreground opacity-60">
+                                      {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                    {!notif.isRead && (
+                                       <span className="text-[9px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-lg border border-primary/20">
+                                          ACTION_REQUIRED
+                                       </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </Link>
                             </div>
                           </div>
                         ))
                       )}
                     </div>
 
-                    {/* Footer with mark all read if there are unread notifications */}
                     {unreadCount > 0 && notifications.length > 0 && (
                       <div className="p-3 border-t border-border bg-muted/30">
                         <button

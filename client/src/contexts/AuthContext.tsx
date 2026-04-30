@@ -35,7 +35,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       setUser(userData?.user);
       // console.group("Get me");
       // console.log("isLoading: ", isLoading);
-      console.log("userData: ", userData);
+      // console.log("userData: ", userData);
       // console.groupEnd();
     } catch (error) {
       setUser(null);

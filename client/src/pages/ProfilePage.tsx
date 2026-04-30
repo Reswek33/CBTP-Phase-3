@@ -2,7 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { getMe, updateCredentials } from "../services/api/auth-api";
+import { getMe, updateCredentials, updateProfile } from "../services/api/auth-api";
+import { toast } from "sonner";
 import {
   User,
   Building2,
@@ -304,12 +305,216 @@ const PasswordChangeModal: React.FC<{
   );
 };
 
+// Edit Profile Modal Component
+const EditProfileModal: React.FC<{
+  isOpen: boolean;
+  user: UserType;
+  onClose: () => void;
+  onSuccess: () => void;
+}> = ({ isOpen, user, onClose, onSuccess }) => {
+  const [formData, setFormData] = useState<any>({
+    firstName: user.firstName || "",
+    lastName: user.lastName || "",
+    email: user.email || "",
+    // Buyer fields
+    companyName: user.buyer?.companyName || "",
+    companyType: user.buyer?.companyType || "",
+    phone: user.buyer?.phone || user.supplier?.phone || "",
+    address: user.buyer?.address || user.supplier?.address || "",
+    industrySector: user.buyer?.industrySector || "",
+    department: user.buyer?.department || "",
+    position: user.buyer?.position || "",
+    // Supplier fields
+    businessName: user.supplier?.businessName || "",
+    businessType: user.supplier?.businessType || "",
+    bio: user.supplier?.bio || "",
+    categories: user.supplier?.categories || [],
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+        companyName: user.buyer?.companyName || "",
+        companyType: user.buyer?.companyType || "",
+        phone: user.buyer?.phone || user.supplier?.phone || "",
+        address: user.buyer?.address || user.supplier?.address || "",
+        industrySector: user.buyer?.industrySector || "",
+        department: user.buyer?.department || "",
+        position: user.buyer?.position || "",
+        businessName: user.supplier?.businessName || "",
+        businessType: user.supplier?.businessType || "",
+        bio: user.supplier?.bio || "",
+        categories: user.supplier?.categories || [],
+      });
+    }
+  }, [isOpen, user]);
+
+  if (!isOpen) return null;
+
+  const isBuyer = user.role === "BUYER";
+  const isSupplier = user.role === "SUPPLIER";
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await updateProfile(formData);
+      toast.success("Profile updated successfully");
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to update profile");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in p-4 overflow-y-auto">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-2xl animate-scale-in my-8">
+        <div className="flex items-center justify-between p-6 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+              <Edit2 className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold">Edit Profile</h3>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-muted rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-xs font-mono text-muted-foreground uppercase">First Name</label>
+              <input
+                required
+                type="text"
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-mono text-muted-foreground uppercase">Last Name</label>
+              <input
+                required
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-mono text-muted-foreground uppercase">Email Address</label>
+              <input
+                required
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+              />
+            </div>
+
+            {isBuyer && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-muted-foreground uppercase">Company Name</label>
+                  <input
+                    type="text"
+                    value={formData.companyName}
+                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-muted-foreground uppercase">Industry Sector</label>
+                  <input
+                    type="text"
+                    value={formData.industrySector}
+                    onChange={(e) => setFormData({ ...formData, industrySector: e.target.value })}
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                  />
+                </div>
+              </>
+            )}
+
+            {isSupplier && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-muted-foreground uppercase">Business Name</label>
+                  <input
+                    type="text"
+                    value={formData.businessName}
+                    onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-muted-foreground uppercase">Business Type</label>
+                  <input
+                    type="text"
+                    value={formData.businessType}
+                    onChange={(e) => setFormData({ ...formData, businessType: e.target.value })}
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-xs font-mono text-muted-foreground uppercase">Phone Number</label>
+              <input
+                type="text"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-mono text-muted-foreground uppercase">Address</label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-6 border-t border-border">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+            >
+              {isSubmitting ? "Saving Changes..." : "Save Profile"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export const ProfilePage: React.FC = () => {
   const { user: authUser } = useAuth();
   const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
-  const [isEditing, setIsEditing] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [showDocumentViewer, setShowDocumentViewer] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -511,16 +716,12 @@ export const ProfilePage: React.FC = () => {
 
             {!isAdmin && (
               <button
-                onClick={() => setIsEditing(!isEditing)}
+                onClick={() => setShowEditModal(true)}
                 className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2
                   bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
               >
-                {isEditing ? (
-                  <X className="w-4 h-4" />
-                ) : (
-                  <Edit2 className="w-4 h-4" />
-                )}
-                {isEditing ? "Cancel" : "Edit Profile"}
+                <Edit2 className="w-4 h-4" />
+                Edit Profile
               </button>
             )}
           </div>
@@ -1071,6 +1272,13 @@ export const ProfilePage: React.FC = () => {
       <PasswordChangeModal
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
+        onSuccess={refreshUser}
+      />
+
+      <EditProfileModal
+        isOpen={showEditModal}
+        user={user}
+        onClose={() => setShowEditModal(false)}
         onSuccess={refreshUser}
       />
 

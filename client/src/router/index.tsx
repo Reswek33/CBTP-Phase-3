@@ -16,6 +16,12 @@ import LissajousLoader from "@/components/ui/LissajousDrift";
 import { BidRoomCreatePage } from "@/pages/BidRoomCreatePage";
 import { BidRoomDetailPage } from "@/pages/BidRoomDetailPage";
 import { BidRoomPage } from "@/pages/BidRoomPage";
+import Subscriptions from "../components/admin/Subscriptions";
+import Transactions from "../components/admin/Transactions";
+import Disputes from "../components/admin/Disputes";
+import Analytics from "../components/admin/Analytics";
+import SystemSettings from "../components/admin/SystemSettings";
+import HelpCenter from "../components/HelpCenter";
 
 // 1. Lazy load ALL page components
 const Login = lazy(() => import("../pages/LoginPage"));
@@ -38,11 +44,7 @@ const SupplierOnboardingPage = lazy(
 const ProfilePage = lazy(() =>
   import("../pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
 );
-const UserManagement = lazy(() =>
-  import("../pages/UserManagement").then((m) => ({
-    default: m.UserManagement,
-  })),
-);
+const UserManagement = lazy(() => import("../pages/UserManagement"));
 const UserDetailView = lazy(() =>
   import("../pages/UserDetailView").then((m) => ({
     default: m.UserDetailView,
@@ -80,12 +82,12 @@ export const router = createBrowserRouter([
     errorElement: <ErrorPage />,
   },
   {
-    path: "/buyerform",
+    path: "/register/buyer",
     element: <BuyerRegister />,
     errorElement: <ErrorPage />,
   },
   {
-    path: "/supplierform",
+    path: "/register/supplier",
     element: <SupplierRegister />,
     errorElement: <ErrorPage />,
   },
@@ -199,6 +201,36 @@ export const router = createBrowserRouter([
         errorElement: <ErrorPage />,
       },
       {
+        path: "admin/subscriptions",
+        element: <Subscriptions />,
+        errorElement: <ErrorPage />,
+      },
+      {
+        path: "admin/transactions",
+        element: <Transactions />,
+        errorElement: <ErrorPage />,
+      },
+      {
+        path: "admin/disputes",
+        element: <Disputes />,
+        errorElement: <ErrorPage />,
+      },
+      {
+        path: "admin/analytics",
+        element: <Analytics />,
+        errorElement: <ErrorPage />,
+      },
+      {
+        path: "admin/settings",
+        element: <SystemSettings />,
+        errorElement: <ErrorPage />,
+      },
+      {
+        path: "help",
+        element: <HelpCenter />,
+        errorElement: <ErrorPage />,
+      },
+      {
         path: "profile",
         element: (
           <Suspense fallback={<PageLoader />}>
@@ -232,7 +264,8 @@ export const router = createBrowserRouter([
     path: "/payment-status",
     element: (
       <Suspense fallback={<PageLoader />}>
-        <PaymentStatusPage />
+        {" "}
+        <PaymentStatusPage />{" "}
       </Suspense>
     ),
     errorElement: <ErrorPage />,
@@ -242,9 +275,5 @@ export const router = createBrowserRouter([
     element: <UnauthorizedPage />,
     errorElement: <ErrorPage />,
   },
-  {
-    path: "*",
-    element: <NotFoundPage />,
-    errorElement: <ErrorPage />,
-  },
+  { path: "*", element: <NotFoundPage />, errorElement: <ErrorPage /> },
 ]);

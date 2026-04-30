@@ -68,3 +68,8 @@ export const updateCredentials = async (data: {
   const response = await api.patch("/auth/update", data);
   return response.data;
 };
+
+export const updateProfile = async (data: any) => {
+  const response = await api.patch("/users", data);
+  return response.data;
+};
