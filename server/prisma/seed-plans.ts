@@ -1,4 +1,4 @@
-import { PrismaClient } from "./../generated/prisma/index.js";
+import { PrismaClient, Currency } from "./../generated/prisma/index.js";
 import { PrismaPg } from "@prisma/adapter-pg";
 import "dotenv/config";
 
@@ -12,36 +12,39 @@ async function main() {
   const plans = [
     {
       name: "Basic",
-      description: "Essential tools for small businesses starting their bidding journey.",
+      description:
+        "Essential tools for small businesses starting their bidding journey.",
       price: 500,
-      currency: "ETB",
+      currency: Currency.ETB,
       durationDays: 30,
       features: [
         "Up to 5 active bids per month",
         "Basic RFP search and filters",
         "Email notifications for new RFPs",
-        "Standard support"
-      ]
+        "Standard support",
+      ],
     },
     {
       name: "Professional",
-      description: "Advanced features for growing companies looking to scale their operations.",
+      description:
+        "Advanced features for growing companies looking to scale their operations.",
       price: 1500,
-      currency: "ETB",
+      currency: Currency.ETB,
       durationDays: 30,
       features: [
         "Unlimited active bids",
         "Priority access to Bid Rooms",
         "Advanced analytics and reporting",
         "Instant SMS notifications",
-        "Priority email support"
-      ]
+        "Priority email support",
+      ],
     },
     {
       name: "Enterprise",
-      description: "Customized solutions for large organizations requiring maximum efficiency.",
+      description:
+        "Customized solutions for large organizations requiring maximum efficiency.",
       price: 5000,
-      currency: "ETB",
+      currency: Currency.ETB,
       durationDays: 365,
       features: [
         "Everything in Professional",
@@ -49,9 +52,9 @@ async function main() {
         "Custom integration support",
         "Bulk RFP creation tools",
         "Early access to beta features",
-        "24/7 Phone support"
-      ]
-    }
+        "24/7 Phone support",
+      ],
+    },
   ];
 
   for (const plan of plans) {
