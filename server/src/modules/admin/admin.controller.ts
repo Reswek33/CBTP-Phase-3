@@ -418,24 +418,33 @@ export const adminController = {
       handleError("PATCH /admin/status", err, res);
     }
   },
-  
+
   getAdminDashboardStats: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const [userCount, supplierCount, buyerCount, activeSubCount, totalRevenue] = await Promise.all([
+      const [
+        userCount,
+        supplierCount,
+        buyerCount,
+        activeSubCount,
+        totalRevenue,
+      ] = await Promise.all([
         prisma.user.count(),
         prisma.supplier.count(),
         prisma.buyer.count(),
-        prisma.subscription.count({ where: { status: 'ACTIVE' } }),
+        prisma.subscription.count({ where: { status: "ACTIVE" } }),
         prisma.paymentTransaction.aggregate({
-          where: { status: 'SUCCESS' },
-          _sum: { amount: true }
-        })
+          where: { status: "SUCCESS" },
+          _sum: { amount: true },
+        }),
       ]);
 
       const recentTransactions = await prisma.paymentTransaction.findMany({
         take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: { user: { select: { firstName: true, lastName: true, email: true } }, plan: true }
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: { select: { firstName: true, lastName: true, email: true } },
+          plan: true,
+        },
       });
 
       res.status(200).json({
@@ -448,8 +457,8 @@ export const adminController = {
             activeSubscriptions: activeSubCount,
             totalRevenue: totalRevenue._sum.amount || 0,
           },
-          recentTransactions
-        }
+          recentTransactions,
+        },
       });
     } catch (err) {
       handleError("GET /admin/dashboard-stats", err, res);
@@ -460,10 +469,17 @@ export const adminController = {
     try {
       const subscriptions = await prisma.subscription.findMany({
         include: {
-          user: { select: { firstName: true, lastName: true, email: true, username: true } },
-          plan: true
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+              username: true,
+            },
+          },
+          plan: true,
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: "desc" },
       });
       res.status(200).json({ success: true, data: subscriptions });
     } catch (err) {
@@ -475,10 +491,17 @@ export const adminController = {
     try {
       const transactions = await prisma.paymentTransaction.findMany({
         include: {
-          user: { select: { firstName: true, lastName: true, email: true, username: true } },
-          plan: true
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+              username: true,
+            },
+          },
+          plan: true,
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: "desc" },
       });
       res.status(200).json({ success: true, data: transactions });
     } catch (err) {
@@ -488,7 +511,8 @@ export const adminController = {
 
   createAdmin: async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { firstName, lastName, username, email, password, adminRole } = req.body;
+      const { firstName, lastName, username, email, password, adminRole } =
+        req.body;
 
       // 1. Check if user already exists
       const existingUser = await prisma.user.findFirst({
@@ -549,17 +573,41 @@ export const adminController = {
         orderBy: { createdAt: "asc" },
       });
 
-      const stats = logs.reduce((acc: any, log) => {
-        const date = log.createdAt.toISOString().split("T")[0];
-        if (!acc[date]) acc[date] = { date, total: 0, actions: {} };
+      // Define a clear interface for the daily stats
+      interface DayStat {
+        date: string;
+        total: number;
+        actions: Record<string, number>;
+      }
+
+      const statsMap = logs.reduce<Record<string, DayStat>>((acc, log) => {
+        const date = log.createdAt.toISOString().split("T")[0] as string;
+
+        // Initialize the date entry if it doesn't exist
+        if (!acc[date]) {
+          acc[date] = {
+            date,
+            total: 0,
+            actions: {},
+          };
+        }
+
         acc[date].total += 1;
-        const actionBase = log.action.split(":")[0]; // Group by general action type
-        acc[date].actions[actionBase] = (acc[date].actions[actionBase] || 0) + 1;
+
+        // Group by general action type (e.g., "USER:LOGIN" -> "USER")
+        const actionBase = log.action.split(":")[0] as string;
+        acc[date].actions[actionBase] =
+          (acc[date].actions[actionBase] || 0) + 1;
+
         return acc;
       }, {});
 
-      res.status(200).json({ success: true, data: Object.values(stats) });
+      return res.status(200).json({
+        success: true,
+        data: Object.values(statsMap),
+      });
     } catch (err) {
+      // Ensure your handleError doesn't crash if res is undefined
       handleError("GET /admin/audit-stats", err, res);
     }
   },
