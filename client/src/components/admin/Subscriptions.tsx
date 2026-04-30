@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 import { getSubscriptions } from "@/services/api/admin-api";
 import {
@@ -9,7 +10,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Calendar, Zap, AlertCircle, Search, Clock } from "lucide-react";
+import {
+  CreditCard,
+  Calendar,
+  Zap,
+  AlertCircle,
+  Search,
+  Clock,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -38,7 +46,7 @@ const Subscriptions = () => {
     (sub) =>
       sub.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sub.user?.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sub.plan?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      sub.plan?.name?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const getStatusColor = (status: string) => {
@@ -58,7 +66,9 @@ const Subscriptions = () => {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-sm font-mono text-muted-foreground">LOADING_SUBSCRIPTIONS...</p>
+        <p className="text-sm font-mono text-muted-foreground">
+          LOADING_SUBSCRIPTIONS...
+        </p>
       </div>
     );
   }
@@ -82,7 +92,9 @@ const Subscriptions = () => {
             placeholder="Search by user, email or plan..."
             className="pl-10 h-11 bg-card border-border rounded-xl focus:ring-primary/20"
             value={searchTerm}
-            onChange={(e: { target: { value: React.SetStateAction<string>; }; }) => setSearchTerm(e.target.value)}
+            onChange={(e: {
+              target: { value: React.SetStateAction<string> };
+            }) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
@@ -96,7 +108,9 @@ const Subscriptions = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{subscriptions.filter(s => s.status === 'ACTIVE').length}</div>
+            <div className="text-2xl font-bold">
+              {subscriptions.filter((s) => s.status === "ACTIVE").length}
+            </div>
           </CardContent>
         </Card>
         <Card className="bg-card border-border overflow-hidden">
@@ -107,7 +121,9 @@ const Subscriptions = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{subscriptions.filter(s => s.status === 'EXPIRED').length}</div>
+            <div className="text-2xl font-bold">
+              {subscriptions.filter((s) => s.status === "EXPIRED").length}
+            </div>
           </CardContent>
         </Card>
         <Card className="bg-card border-border overflow-hidden">
@@ -137,27 +153,41 @@ const Subscriptions = () => {
           <TableBody>
             {filteredSubscriptions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-40 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={5}
+                  className="h-40 text-center text-muted-foreground"
+                >
                   No subscriptions found matching your criteria.
                 </TableCell>
               </TableRow>
             ) : (
               filteredSubscriptions.map((sub) => (
-                <TableRow key={sub.id} className="hover:bg-muted/30 transition-colors border-border">
+                <TableRow
+                  key={sub.id}
+                  className="hover:bg-muted/30 transition-colors border-border"
+                >
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
-                        {sub.user?.firstName?.charAt(0)}{sub.user?.lastName?.charAt(0)}
+                        {sub.user?.firstName?.charAt(0)}
+                        {sub.user?.lastName?.charAt(0)}
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{sub.user?.firstName} {sub.user?.lastName}</p>
-                        <p className="text-xs text-muted-foreground">{sub.user?.email}</p>
+                        <p className="font-medium text-sm">
+                          {sub.user?.firstName} {sub.user?.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {sub.user?.email}
+                        </p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+                      <Badge
+                        variant="outline"
+                        className="bg-primary/5 text-primary border-primary/20"
+                      >
                         {sub.plan?.name}
                       </Badge>
                     </div>
@@ -171,17 +201,21 @@ const Subscriptions = () => {
                     <div className="text-xs space-y-1">
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Calendar className="w-3 h-3" />
-                        <span>Start: {new Date(sub.startDate).toLocaleDateString()}</span>
+                        <span>
+                          Start: {new Date(sub.startDate).toLocaleDateString()}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 font-medium">
                         <Clock className="w-3 h-3" />
-                        <span>End: {new Date(sub.endDate).toLocaleDateString()}</span>
+                        <span>
+                          End: {new Date(sub.endDate).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                      {sub.txRef || 'N/A'}
+                      {sub.txRef || "N/A"}
                     </code>
                   </TableCell>
                 </TableRow>
