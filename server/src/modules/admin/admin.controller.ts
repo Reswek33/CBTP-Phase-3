@@ -5,6 +5,7 @@ import { logActivity } from "../../shared/utils/logger.js";
 import handleError from "../../shared/utils/error.js";
 import { getIO } from "../../config/socket.js";
 import { sendNotification } from "../../shared/utils/notification.js";
+import bcrypt from "bcryptjs";
 
 export const adminController = {
   getPendingSuppliers: async (req: AuthenticatedRequest, res: Response) => {
@@ -415,6 +416,151 @@ export const adminController = {
     } catch (err) {
       console.error("[VERIFY_BUYER_ADMIN]", err);
       handleError("PATCH /admin/status", err, res);
+    }
+  },
+  
+  getAdminDashboardStats: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const [userCount, supplierCount, buyerCount, activeSubCount, totalRevenue] = await Promise.all([
+        prisma.user.count(),
+        prisma.supplier.count(),
+        prisma.buyer.count(),
+        prisma.subscription.count({ where: { status: 'ACTIVE' } }),
+        prisma.paymentTransaction.aggregate({
+          where: { status: 'SUCCESS' },
+          _sum: { amount: true }
+        })
+      ]);
+
+      const recentTransactions = await prisma.paymentTransaction.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: { user: { select: { firstName: true, lastName: true, email: true } }, plan: true }
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          metrics: {
+            totalUsers: userCount,
+            totalSuppliers: supplierCount,
+            totalBuyers: buyerCount,
+            activeSubscriptions: activeSubCount,
+            totalRevenue: totalRevenue._sum.amount || 0,
+          },
+          recentTransactions
+        }
+      });
+    } catch (err) {
+      handleError("GET /admin/dashboard-stats", err, res);
+    }
+  },
+
+  getAllSubscriptions: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const subscriptions = await prisma.subscription.findMany({
+        include: {
+          user: { select: { firstName: true, lastName: true, email: true, username: true } },
+          plan: true
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      res.status(200).json({ success: true, data: subscriptions });
+    } catch (err) {
+      handleError("GET /admin/subscriptions", err, res);
+    }
+  },
+
+  getAllTransactions: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const transactions = await prisma.paymentTransaction.findMany({
+        include: {
+          user: { select: { firstName: true, lastName: true, email: true, username: true } },
+          plan: true
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      res.status(200).json({ success: true, data: transactions });
+    } catch (err) {
+      handleError("GET /admin/transactions", err, res);
+    }
+  },
+
+  createAdmin: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { firstName, lastName, username, email, password, adminRole } = req.body;
+
+      // 1. Check if user already exists
+      const existingUser = await prisma.user.findFirst({
+        where: { OR: [{ email }, { username }] },
+      });
+
+      if (existingUser) {
+        return res.status(409).json({
+          success: false,
+          message: "Email or Username already in use",
+        });
+      }
+
+      // 2. Hash Password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // 3. Create Admin
+      const newAdmin = await prisma.user.create({
+        data: {
+          firstName,
+          lastName,
+          username,
+          email,
+          passwordHash: hashedPassword,
+          role: "ADMIN",
+          adminRole: adminRole || "SUPPORT_ADMIN",
+          isActive: true,
+        },
+      });
+
+      await logActivity(
+        `New Admin created: ${newAdmin.username}`,
+        "INFO",
+        req.user?.id,
+        "AdminController.createAdmin",
+      );
+
+      res.status(201).json({ success: true, data: newAdmin });
+    } catch (err) {
+      console.error("[ADMIN_CREATE_ADMIN]", err);
+      handleError("POST /admin/create-admin", err, res);
+    }
+  },
+
+  getAuditStats: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const logs = await prisma.activityLog.findMany({
+        where: {
+          createdAt: { gte: thirtyDaysAgo },
+        },
+        select: {
+          createdAt: true,
+          action: true,
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const stats = logs.reduce((acc: any, log) => {
+        const date = log.createdAt.toISOString().split("T")[0];
+        if (!acc[date]) acc[date] = { date, total: 0, actions: {} };
+        acc[date].total += 1;
+        const actionBase = log.action.split(":")[0]; // Group by general action type
+        acc[date].actions[actionBase] = (acc[date].actions[actionBase] || 0) + 1;
+        return acc;
+      }, {});
+
+      res.status(200).json({ success: true, data: Object.values(stats) });
+    } catch (err) {
+      handleError("GET /admin/audit-stats", err, res);
     }
   },
 };
