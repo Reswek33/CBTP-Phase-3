@@ -39,6 +39,7 @@ export const rfpsController = {
         deadline: validatedData.deadline,
         priority: validatedData.priority,
         status: "OPEN",
+        workflow: validatedData.workflow || "STANDARD",
         buyer: { connect: { id: userId } },
       };
 
