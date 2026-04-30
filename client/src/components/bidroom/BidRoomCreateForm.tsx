@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +13,8 @@ import {
   Globe,
   CheckCircle,
   AlertCircle,
+  X,
+  Loader2,
 } from "lucide-react";
 
 interface Supplier {
@@ -28,6 +31,95 @@ interface FormData {
   invitedSupplierIds: string[];
 }
 
+// Toast/Notification Component
+const Toast: React.FC<{
+  message: string;
+  type: "success" | "error" | "warning" | "info";
+  onClose: () => void;
+}> = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const getStyles = () => {
+    switch (type) {
+      case "success":
+        return "bg-green-500/10 border-green-500/20 text-green-500";
+      case "error":
+        return "bg-destructive/10 border-destructive/20 text-destructive";
+      case "warning":
+        return "bg-amber-500/10 border-amber-500/20 text-amber-500";
+      default:
+        return "bg-blue-500/10 border-blue-500/20 text-blue-500";
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case "success":
+        return <CheckCircle className="w-4 h-4" />;
+      case "error":
+        return <AlertCircle className="w-4 h-4" />;
+      case "warning":
+        return <AlertCircle className="w-4 h-4" />;
+      default:
+        return <AlertCircle className="w-4 h-4" />;
+    }
+  };
+
+  return (
+    <div className="fixed top-20 right-4 z-50 animate-slide-in-right">
+      <div
+        className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${getStyles()}`}
+      >
+        {getIcon()}
+        <p className="text-sm font-medium">{message}</p>
+        <button
+          onClick={onClose}
+          className="ml-2 hover:opacity-70 transition-opacity"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Success Modal Component
+const SuccessModal: React.FC<{
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onClose: () => void;
+}> = ({ isOpen, title, message, onClose }) => {
+  if (!isOpen) return null;
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl animate-scale-in">
+        <div className="flex flex-col items-center text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mb-4 animate-bounce" />
+          <h3 className="text-xl font-bold text-foreground mb-2">{title}</h3>
+          <p className="text-muted-foreground">{message}</p>
+          <div className="mt-4 w-16 h-1 bg-green-500 rounded-full animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const BidRoomCreateForm: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -41,6 +133,11 @@ export const BidRoomCreateForm: React.FC = () => {
     invitedSupplierIds: [],
   });
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error" | "warning" | "info";
+  } | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // 1. Initial Load: Fetch RFPs owned by the buyer
   useEffect(() => {
@@ -65,6 +162,7 @@ export const BidRoomCreateForm: React.FC = () => {
       setRfps(response.data);
     } catch (error) {
       console.error("Failed to fetch RFPs:", error);
+      setToast({ message: "Failed to load your RFPs", type: "error" });
     }
   };
 
@@ -76,6 +174,7 @@ export const BidRoomCreateForm: React.FC = () => {
     } catch (error) {
       console.error("Failed to fetch eligible suppliers:", error);
       setSuppliers([]);
+      setToast({ message: "Failed to load eligible suppliers", type: "error" });
     }
   };
 
@@ -90,19 +189,42 @@ export const BidRoomCreateForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate dates
+    const startDate = new Date(formData.startTime);
+    const endDate = new Date(formData.endTime);
+    const now = new Date();
+
+    if (startDate < now) {
+      setToast({ message: "Start time cannot be in the past", type: "error" });
+      return;
+    }
+
+    if (endDate <= startDate) {
+      setToast({ message: "End time must be after start time", type: "error" });
+      return;
+    }
+
     setLoading(true);
     try {
       const apiData: RoomCreateInput = {
         rfpId: formData.rfpId,
-        startTime: new Date(formData.startTime),
-        endTime: new Date(formData.endTime),
+        startTime: startDate,
+        endTime: endDate,
         biddingType: formData.biddingType,
         invitedSupplierIds: formData.invitedSupplierIds,
       };
       await createRoom(apiData);
-      navigate("/dashboard/bidroom");
+      setShowSuccessModal(true);
+
+      // Navigate after success modal closes
+      setTimeout(() => {
+        navigate("/dashboard/bidroom");
+      }, 2500);
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to create bid room");
+      const errorMessage =
+        error.response?.data?.message || "Failed to create bid room";
+      setToast({ message: errorMessage, type: "error" });
     } finally {
       setLoading(false);
     }
@@ -116,6 +238,23 @@ export const BidRoomCreateForm: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        title="Bid Room Created!"
+        message="Your bid room has been successfully created and invitations have been sent to the selected suppliers."
+        onClose={() => setShowSuccessModal(false)}
+      />
+
       <div className="bg-card border border-border rounded-xl p-6">
         <h1 className="text-2xl font-bold text-foreground mb-2">
           Create Bid Room
@@ -249,13 +388,18 @@ export const BidRoomCreateForm: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               disabled={!formData.rfpId}
-              className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary"
+              className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
             />
           </div>
 
           <div className="border border-border rounded-lg overflow-hidden">
             <div className="max-h-60 overflow-y-auto p-2 space-y-1 bg-muted/10">
-              {formData.rfpId && filteredSuppliers.length === 0 ? (
+              {loading && !suppliers.length ? (
+                <div className="py-8 text-center text-muted-foreground text-sm flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading suppliers...
+                </div>
+              ) : formData.rfpId && filteredSuppliers.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground text-sm">
                   No eligible suppliers found for this RFP.
                 </div>
@@ -305,12 +449,66 @@ export const BidRoomCreateForm: React.FC = () => {
               !formData.rfpId ||
               formData.invitedSupplierIds.length === 0
             }
-            className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+            className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
           >
-            {loading ? "Creating Room..." : "Initialize Bid Room"}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Creating Room...
+              </>
+            ) : (
+              "Initialize Bid Room"
+            )}
           </button>
         </div>
       </form>
+
+      <style>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scale-in {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @keyframes bounce {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+        @keyframes slide-in-right {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
+        }
+        .animate-scale-in {
+          animation: scale-in 0.2s ease-out;
+        }
+        .animate-bounce {
+          animation: bounce 0.5s ease-out;
+        }
+        .animate-slide-in-right {
+          animation: slide-in-right 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

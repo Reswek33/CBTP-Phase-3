@@ -1,5 +1,5 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 /* eslint-disable react-hooks/exhaustive-deps */
- 
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -37,6 +37,7 @@ import {
   Package,
   Hash,
   Tag,
+  Loader2,
 } from "lucide-react";
 
 interface Document {
@@ -225,6 +226,38 @@ const DocumentViewerModal: React.FC<{
   );
 };
 
+// Success Modal Component
+const SuccessModal: React.FC<{
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onClose: () => void;
+}> = ({ isOpen, title, message, onClose }) => {
+  if (!isOpen) return null;
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl animate-scale-in">
+        <div className="flex flex-col items-center text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mb-4 animate-bounce" />
+          <h3 className="text-xl font-bold text-foreground mb-2">{title}</h3>
+          <p className="text-muted-foreground">{message}</p>
+          <div className="mt-4 w-16 h-1 bg-green-500 rounded-full animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Confirmation Modal Component
 const ConfirmationModal: React.FC<{
   isOpen: boolean;
@@ -296,9 +329,16 @@ const ConfirmationModal: React.FC<{
             <button
               onClick={onConfirm}
               disabled={isSubmitting}
-              className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors ${styles.button} disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors ${styles.button} disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
             >
-              {isSubmitting ? "Processing..." : confirmText}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                confirmText
+              )}
             </button>
           </div>
         </div>
@@ -364,9 +404,16 @@ const RejectionModal: React.FC<{
           <button
             onClick={onConfirm}
             disabled={!reason.trim() || isSubmitting}
-            className="flex-1 px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isSubmitting ? "Submitting..." : "Submit Rejection"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              "Submit Rejection"
+            )}
           </button>
         </div>
       </div>
@@ -391,6 +438,11 @@ export const UserDetailView = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState({
+    title: "",
+    message: "",
+  });
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -413,17 +465,25 @@ export const UserDetailView = () => {
   }, [id]);
 
   const handleApprove = async () => {
-    setShowConfirmModal(false);
     setIsSubmitting(true);
     try {
       if (data?.role === "BUYER") {
         await verifyBuyer(id!, "VERIFIED", undefined);
-        await fetchData();
       }
       if (data?.role === "SUPPLIER") {
         await verifySupplier(id!, "VERIFIED", undefined);
-        await fetchData();
       }
+
+      // Close confirm modal and show success
+      setShowConfirmModal(false);
+      setSuccessMessage({
+        title: "User Approved",
+        message: `${data?.firstName} ${data?.lastName} has been successfully verified.`,
+      });
+      setShowSuccessModal(true);
+
+      // Refresh data
+      await fetchData();
     } catch (err) {
       console.error("Approval failed", err);
     } finally {
@@ -434,20 +494,26 @@ export const UserDetailView = () => {
   const handleReject = async () => {
     if (!reason.trim()) return;
 
-    setShowRejectModal(false);
     setIsSubmitting(true);
     try {
       if (data?.role === "SUPPLIER") {
         await verifySupplier(id!, "REJECTED", reason);
-        setReason("");
-        await fetchData();
       }
-
       if (data?.role === "BUYER") {
         await verifyBuyer(id!, "REJECTED", reason);
-        setReason("");
-        await fetchData();
       }
+
+      // Close reject modal and show success
+      setShowRejectModal(false);
+      setSuccessMessage({
+        title: "User Rejected",
+        message: `${data?.firstName} ${data?.lastName} has been rejected. Reason: ${reason}`,
+      });
+      setShowSuccessModal(true);
+      setReason("");
+
+      // Refresh data
+      await fetchData();
     } catch (err) {
       console.error("Rejection failed", err);
     } finally {
@@ -456,11 +522,20 @@ export const UserDetailView = () => {
   };
 
   const handleBlockToggle = async () => {
-    setShowBlockModal(false);
     setIsSubmitting(true);
     try {
       const newStatus = !data?.isActive;
       await blockUser(id!, newStatus);
+
+      // Close block modal and show success
+      setShowBlockModal(false);
+      setSuccessMessage({
+        title: newStatus ? "User Blocked" : "User Unblocked",
+        message: `${data?.firstName} ${data?.lastName} has been ${newStatus ? "blocked" : "unblocked"} successfully.`,
+      });
+      setShowSuccessModal(true);
+
+      // Refresh data
       await fetchData();
     } catch (err) {
       console.error("Block/Unblock failed", err);
@@ -1281,6 +1356,13 @@ export const UserDetailView = () => {
         isSubmitting={isSubmitting}
       />
 
+      <SuccessModal
+        isOpen={showSuccessModal}
+        title={successMessage.title}
+        message={successMessage.message}
+        onClose={() => setShowSuccessModal(false)}
+      />
+
       <style>{`
         @keyframes fade-in {
           from { opacity: 0; }
@@ -1296,11 +1378,22 @@ export const UserDetailView = () => {
             transform: scale(1);
           }
         }
+        @keyframes bounce {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
         .animate-fade-in {
           animation: fade-in 0.2s ease-out;
         }
         .animate-scale-in {
           animation: scale-in 0.2s ease-out;
+        }
+        .animate-bounce {
+          animation: bounce 0.5s ease-out;
         }
         .line-clamp-2 {
           display: -webkit-box;

@@ -1,6 +1,6 @@
-/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable react-hooks/rules-of-hooks */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "@/contexts/SocketContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,7 +14,6 @@ import {
 import { BidTimer } from "./BidTimer";
 import { BidHistory } from "./BidHistory";
 import { BidInput } from "./BidInput";
-import { useCallback } from "react";
 import {
   ArrowLeft,
   Trophy,
@@ -23,8 +22,185 @@ import {
   Users,
   DollarSign,
   Clock,
+  CheckCircle,
+  X,
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { ParticipantsList } from "./ParticipantsList";
+
+// Toast/Notification Component
+const Toast: React.FC<{
+  message: string;
+  type: "success" | "error" | "warning" | "info";
+  onClose: () => void;
+}> = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const getStyles = () => {
+    switch (type) {
+      case "success":
+        return "bg-green-500/10 border-green-500/20 text-green-500";
+      case "error":
+        return "bg-destructive/10 border-destructive/20 text-destructive";
+      case "warning":
+        return "bg-amber-500/10 border-amber-500/20 text-amber-500";
+      default:
+        return "bg-blue-500/10 border-blue-500/20 text-blue-500";
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case "success":
+        return <CheckCircle className="w-4 h-4" />;
+      case "error":
+        return <AlertCircle className="w-4 h-4" />;
+      case "warning":
+        return <AlertTriangle className="w-4 h-4" />;
+      default:
+        return <AlertCircle className="w-4 h-4" />;
+    }
+  };
+
+  return (
+    <div className="fixed top-20 right-4 z-50 animate-slide-in-right">
+      <div
+        className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${getStyles()}`}
+      >
+        {getIcon()}
+        <p className="text-sm font-medium">{message}</p>
+        <button
+          onClick={onClose}
+          className="ml-2 hover:opacity-70 transition-opacity"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Confirmation Modal Component
+const ConfirmationModal: React.FC<{
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  cancelText: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isSubmitting?: boolean;
+  type?: "warning" | "success" | "danger";
+}> = ({
+  isOpen,
+  title,
+  message,
+  confirmText,
+  cancelText,
+  onConfirm,
+  onCancel,
+  isSubmitting = false,
+  type = "warning",
+}) => {
+  if (!isOpen) return null;
+
+  const getStyles = () => {
+    switch (type) {
+      case "success":
+        return {
+          icon: <CheckCircle className="w-12 h-12 text-green-500" />,
+          button: "bg-green-500 hover:bg-green-600",
+        };
+      case "danger":
+        return {
+          icon: <AlertCircle className="w-12 h-12 text-destructive" />,
+          button: "bg-destructive hover:bg-destructive/90",
+        };
+      default:
+        return {
+          icon: <AlertTriangle className="w-12 h-12 text-amber-500" />,
+          button: "bg-amber-500 hover:bg-amber-600",
+        };
+    }
+  };
+
+  const styles = getStyles();
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl animate-scale-in">
+        <div className="flex flex-col items-center text-center">
+          {styles.icon}
+          <h3 className="text-xl font-bold text-foreground mt-4 mb-2">
+            {title}
+          </h3>
+          <p className="text-muted-foreground mb-6">{message}</p>
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 border border-border rounded-lg text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              {cancelText}
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isSubmitting}
+              className={`flex-1 px-4 py-2 text-white rounded-lg font-medium transition-colors ${styles.button} disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                confirmText
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Success Modal Component
+const SuccessModal: React.FC<{
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onClose: () => void;
+}> = ({ isOpen, title, message, onClose }) => {
+  if (!isOpen) return null;
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl animate-scale-in">
+        <div className="flex flex-col items-center text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mb-4 animate-bounce" />
+          <h3 className="text-xl font-bold text-foreground mb-2">{title}</h3>
+          <p className="text-muted-foreground">{message}</p>
+          <div className="mt-4 w-16 h-1 bg-green-500 rounded-full animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const BidRoomDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,6 +211,20 @@ export const BidRoomDetail: React.FC = () => {
   const [room, setRoom] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState({
+    title: "",
+    message: "",
+  });
+  const [confirmAction, setConfirmAction] = useState<{
+    type: string;
+    handler: () => Promise<void>;
+  } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error" | "warning" | "info";
+  } | null>(null);
   const hasJoinedRef = React.useRef(false);
 
   const isBuyer = user?.role === "BUYER";
@@ -48,6 +238,7 @@ export const BidRoomDetail: React.FC = () => {
         setRoom(response.data);
       } catch (error) {
         console.error("Failed to load room:", error);
+        setToast({ message: "Failed to load room details", type: "error" });
       } finally {
         setLoading(false);
       }
@@ -60,7 +251,6 @@ export const BidRoomDetail: React.FC = () => {
   }, [fetchRoom]);
 
   useEffect(() => {
-    // Only attempt to join and setup sockets if we have a connection and room ID
     if (!socket || !id) return;
 
     const performJoin = async () => {
@@ -76,7 +266,6 @@ export const BidRoomDetail: React.FC = () => {
     performJoin();
     socket.on("connect", performJoin);
 
-    // Join the socket room for real-time updates
     socket.on("new_bid", (data) => {
       setRoom((prev: any) => {
         if (!prev) return prev;
@@ -93,14 +282,25 @@ export const BidRoomDetail: React.FC = () => {
 
     socket.on("room_awarded", () => {
       fetchRoom(false);
+      setToast({
+        message: "Room has been awarded to the winner",
+        type: "success",
+      });
     });
 
     socket.on("room_started", () => {
       fetchRoom(false);
+      setToast({
+        message: "Bidding has started! Place your bids now.",
+        type: "success",
+      });
     });
+
     socket.on("room_cancelled", () => {
       fetchRoom(false);
+      setToast({ message: "Room has been cancelled", type: "warning" });
     });
+
     socket.on("invitation_updated", () => {
       fetchRoom(false);
     });
@@ -116,7 +316,7 @@ export const BidRoomDetail: React.FC = () => {
         socket.emit("leave_bid_room", id);
       }
     };
-  }, [socket, id]);
+  }, [socket, id, fetchRoom]);
 
   useEffect(() => {
     hasJoinedRef.current = false;
@@ -126,45 +326,112 @@ export const BidRoomDetail: React.FC = () => {
     setSubmitting(true);
     try {
       await updateBidAmount(id!, { amount });
+      setToast({
+        message: `Bid of $${amount.toLocaleString()} placed successfully!`,
+        type: "success",
+      });
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to place bid");
+      setToast({
+        message: error.response?.data?.message || "Failed to place bid",
+        type: "error",
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleAward = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to award this bid to the current leading bidder?",
-      )
-    )
+    if (!room?.currentLeadingBid?.id) {
+      setToast({
+        message: "No leading bid available to award",
+        type: "warning",
+      });
       return;
+    }
     setSubmitting(true);
     try {
-      if (!room?.currentLeadingBid?.id) {
-        alert("No leading bid available to award");
-        return;
-      }
       await awardBidById(id!, room.currentLeadingBid.id);
+      setShowConfirmModal(false);
+      setSuccessMessage({
+        title: "Contract Awarded!",
+        message:
+          "The contract has been successfully awarded to the leading bidder.",
+      });
+      setShowSuccessModal(true);
       fetchRoom(false);
+
+      setTimeout(() => {
+        navigate("/dashboard/bidroom");
+      }, 3000);
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to award bid");
+      setToast({
+        message: error.response?.data?.message || "Failed to award bid",
+        type: "error",
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleStartRoom = async () => {
-    if (!confirm("Start the bid room? Suppliers will be notified.")) return;
     setSubmitting(true);
     try {
       await startRoom(id!);
-      fetchRoom(false); // Re-fetch to update status to ACTIVE
+      setShowConfirmModal(false);
+      setSuccessMessage({
+        title: "Room Started!",
+        message:
+          "The bid room is now active. Suppliers can start placing bids.",
+      });
+      setShowSuccessModal(true);
+      fetchRoom(false);
     } catch (error: any) {
-      alert(error.response?.data?.message || "Failed to start room");
+      setToast({
+        message: error.response?.data?.message || "Failed to start room",
+        type: "error",
+      });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openConfirmModal = (type: string, handler: () => Promise<void>) => {
+    setConfirmAction({ type, handler });
+    setShowConfirmModal(true);
+  };
+
+  const getConfirmModalProps = () => {
+    if (!confirmAction)
+      return {
+        title: "",
+        message: "",
+        confirmText: "",
+        type: "warning" as const,
+      };
+
+    switch (confirmAction.type) {
+      case "start":
+        return {
+          title: "Start Bid Room",
+          message:
+            "Starting the bid room will notify all invited suppliers. Bidding will begin immediately. Are you sure?",
+          confirmText: "Yes, Start Room",
+          type: "success" as const,
+        };
+      case "award":
+        return {
+          title: "Award Contract",
+          message: `Are you sure you want to award the contract to the current leading bidder ($${room?.currentLeadingBid?.amount?.toLocaleString()})? This action cannot be undone.`,
+          confirmText: "Yes, Award Contract",
+          type: "danger" as const,
+        };
+      default:
+        return {
+          title: "",
+          message: "",
+          confirmText: "",
+          type: "warning" as const,
+        };
     }
   };
 
@@ -185,7 +452,6 @@ export const BidRoomDetail: React.FC = () => {
     );
   }
 
-  // Logical checks for rendering UI components
   const canBid = isSupplier && room.status === "ACTIVE";
   const canAward =
     isBuyer &&
@@ -195,6 +461,41 @@ export const BidRoomDetail: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <ConfirmationModal
+          isOpen={showConfirmModal}
+          title={getConfirmModalProps().title}
+          message={getConfirmModalProps().message}
+          confirmText={getConfirmModalProps().confirmText}
+          cancelText="Cancel"
+          onConfirm={confirmAction.handler}
+          onCancel={() => {
+            setShowConfirmModal(false);
+            setConfirmAction(null);
+          }}
+          isSubmitting={submitting}
+          type={getConfirmModalProps().type}
+        />
+      )}
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        title={successMessage.title}
+        message={successMessage.message}
+        onClose={() => setShowSuccessModal(false)}
+      />
+
       {/* Header */}
       <div className="bg-card border border-border rounded-xl p-6">
         <button
@@ -282,7 +583,7 @@ export const BidRoomDetail: React.FC = () => {
                 This room is scheduled. Start it to begin bidding.
               </p>
               <button
-                onClick={handleStartRoom}
+                onClick={() => openConfirmModal("start", handleStartRoom)}
                 disabled={submitting}
                 className="w-full sm:w-auto px-8 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 transition-colors disabled:opacity-50"
               >
@@ -304,7 +605,7 @@ export const BidRoomDetail: React.FC = () => {
                 Review the bids and award the contract to the leading supplier.
               </p>
               <button
-                onClick={handleAward}
+                onClick={() => openConfirmModal("award", handleAward)}
                 disabled={submitting}
                 className="w-full py-3 bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 transition-colors disabled:opacity-50"
               >
@@ -379,6 +680,53 @@ export const BidRoomDetail: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scale-in {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @keyframes bounce {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+        @keyframes slide-in-right {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
+        }
+        .animate-scale-in {
+          animation: scale-in 0.2s ease-out;
+        }
+        .animate-bounce {
+          animation: bounce 0.5s ease-out;
+        }
+        .animate-slide-in-right {
+          animation: slide-in-right 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

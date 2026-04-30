@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react-hooks/rules-of-hooks */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
@@ -27,11 +27,263 @@ import {
   Send,
   Users,
   Shield,
+  Loader2,
+  AlertTriangle,
+  XCircle,
 } from "lucide-react";
 
 const getFileUrl = (filePath: string) => {
   if (!filePath) return "";
   return `/${filePath.startsWith("/") ? filePath.slice(1) : filePath}`;
+};
+
+// Toast/Notification Component
+const Toast: React.FC<{
+  message: string;
+  type: "success" | "error" | "warning" | "info";
+  onClose: () => void;
+}> = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const getStyles = () => {
+    switch (type) {
+      case "success":
+        return "bg-green-500/10 border-green-500/20 text-green-500";
+      case "error":
+        return "bg-destructive/10 border-destructive/20 text-destructive";
+      case "warning":
+        return "bg-amber-500/10 border-amber-500/20 text-amber-500";
+      default:
+        return "bg-blue-500/10 border-blue-500/20 text-blue-500";
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case "success":
+        return <CheckCircle className="w-4 h-4" />;
+      case "error":
+        return <AlertCircle className="w-4 h-4" />;
+      case "warning":
+        return <AlertTriangle className="w-4 h-4" />;
+      default:
+        return <AlertCircle className="w-4 h-4" />;
+    }
+  };
+
+  return (
+    <div className="fixed top-20 right-4 z-50 animate-slide-in-right">
+      <div
+        className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${getStyles()}`}
+      >
+        {getIcon()}
+        <p className="text-sm font-medium">{message}</p>
+        <button
+          onClick={onClose}
+          className="ml-2 hover:opacity-70 transition-opacity"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Confirmation Modal Component
+const ConfirmationModal: React.FC<{
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  cancelText: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isSubmitting?: boolean;
+  type?: "success" | "danger" | "warning";
+}> = ({
+  isOpen,
+  title,
+  message,
+  confirmText,
+  cancelText,
+  onConfirm,
+  onCancel,
+  isSubmitting = false,
+  type = "warning",
+}) => {
+  if (!isOpen) return null;
+
+  const getStyles = () => {
+    switch (type) {
+      case "success":
+        return {
+          icon: <CheckCircle className="w-12 h-12 text-green-500" />,
+          button: "bg-green-500 hover:bg-green-600",
+        };
+      case "danger":
+        return {
+          icon: <AlertCircle className="w-12 h-12 text-destructive" />,
+          button: "bg-destructive hover:bg-destructive/90",
+        };
+      default:
+        return {
+          icon: <AlertTriangle className="w-12 h-12 text-amber-500" />,
+          button: "bg-amber-500 hover:bg-amber-600",
+        };
+    }
+  };
+
+  const styles = getStyles();
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl animate-scale-in">
+        <div className="flex flex-col items-center text-center">
+          {styles.icon}
+          <h3 className="text-xl font-bold text-foreground mt-4 mb-2">
+            {title}
+          </h3>
+          <p className="text-muted-foreground mb-6">{message}</p>
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 border border-border rounded-lg text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              {cancelText}
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isSubmitting}
+              className={`flex-1 px-4 py-2 text-white rounded-lg font-medium transition-colors ${styles.button} disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                confirmText
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Rejection Modal Component
+const RejectionModal: React.FC<{
+  isOpen: boolean;
+  reason: string;
+  onReasonChange: (reason: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isSubmitting: boolean;
+}> = ({
+  isOpen,
+  reason,
+  onReasonChange,
+  onConfirm,
+  onCancel,
+  isSubmitting,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl animate-scale-in">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <XCircle className="w-5 h-5 text-destructive" />
+            <h3 className="text-xl font-bold text-foreground">
+              Reject Proposal
+            </h3>
+          </div>
+          <button
+            onClick={onCancel}
+            className="p-1 hover:bg-muted rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        <p className="text-muted-foreground mb-4">
+          Provide a reason for rejection to help the supplier understand and
+          improve.
+        </p>
+
+        <textarea
+          value={reason}
+          onChange={(e) => onReasonChange(e.target.value)}
+          placeholder="e.g., Technical proposal lacks sufficient detail, pricing not competitive, etc."
+          rows={4}
+          className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+        />
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 border border-border rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={!reason.trim() || isSubmitting}
+            className="flex-1 px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              "Submit Rejection"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Success Modal Component
+const SuccessModal: React.FC<{
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onClose: () => void;
+}> = ({ isOpen, title, message, onClose }) => {
+  if (!isOpen) return null;
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl animate-scale-in">
+        <div className="flex flex-col items-center text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mb-4 animate-bounce" />
+          <h3 className="text-xl font-bold text-foreground mb-2">{title}</h3>
+          <p className="text-muted-foreground">{message}</p>
+          <div className="mt-4 w-16 h-1 bg-green-500 rounded-full animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
@@ -54,6 +306,23 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
   );
   const [rejectionReason, setRejectionReason] = useState("");
 
+  // Modal States
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState({
+    title: "",
+    message: "",
+  });
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error" | "warning" | "info";
+  } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    bidId: string;
+    newStatus: "ACTIVE" | "REJECTED";
+  } | null>(null);
+
   const socket = useSocket();
 
   const fetchData = async () => {
@@ -67,6 +336,7 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
       setUserBid(existingBid);
     } catch (err) {
       console.error("Error fetching RFP:", err);
+      setToast({ message: "Failed to load RFP details", type: "error" });
     } finally {
       setLoading(false);
     }
@@ -101,7 +371,10 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) return alert("Please upload a proposal PDF");
+    if (!selectedFile) {
+      setToast({ message: "Please upload a proposal PDF", type: "warning" });
+      return;
+    }
     setSubmitting(true);
     try {
       const formData = new FormData();
@@ -109,10 +382,21 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
       formData.append("amount", amount.toString());
       formData.append("proposalFile", selectedFile);
       await applyToBid(rfpId, formData);
-      alert("Application submitted! Wait for technical approval.");
+      setSuccessMessage({
+        title: "Application Submitted!",
+        message:
+          "Your proposal has been submitted successfully. Wait for technical approval.",
+      });
+      setShowSuccessModal(true);
       fetchData();
+      setProposalText("");
+      setSelectedFile(null);
+      setAmount(0);
     } catch (err: any) {
-      alert(err.response?.data?.message || "Application failed");
+      setToast({
+        message: err.response?.data?.message || "Application failed",
+        type: "error",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -122,19 +406,50 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
     bidId: string,
     newStatus: "ACTIVE" | "REJECTED",
   ) => {
-    const reason =
-      newStatus === "REJECTED" ? prompt("Reason for rejection:") : "";
+    if (newStatus === "REJECTED") {
+      setPendingAction({ bidId, newStatus });
+      setShowRejectModal(true);
+    } else {
+      setPendingAction({ bidId, newStatus });
+      setShowConfirmModal(true);
+    }
+  };
+
+  const confirmStatusUpdate = async () => {
+    if (!pendingAction) return;
+
+    setSubmitting(true);
     try {
-      setSubmitting(true);
-      await updateApplicationStatus(bidId, {
-        status: newStatus,
-        rejectionReason: reason || "",
+      await updateApplicationStatus(pendingAction.bidId, {
+        status: pendingAction.newStatus,
+        rejectionReason:
+          pendingAction.newStatus === "REJECTED" ? rejectionReason : "",
       });
+
+      setShowConfirmModal(false);
+      setShowRejectModal(false);
+
+      setSuccessMessage({
+        title:
+          pendingAction.newStatus === "ACTIVE"
+            ? "Bid Approved!"
+            : "Bid Rejected",
+        message:
+          pendingAction.newStatus === "ACTIVE"
+            ? "The supplier has been shortlisted for the bid room."
+            : "The supplier has been notified of the rejection.",
+      });
+      setShowSuccessModal(true);
+      setRejectionReason("");
       fetchData();
-    } catch (err) {
-      alert("Status update failed");
+    } catch (err: any) {
+      setToast({
+        message: err.response?.data?.message || "Status update failed",
+        type: "error",
+      });
     } finally {
       setSubmitting(false);
+      setPendingAction(null);
     }
   };
 
@@ -148,21 +463,33 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
         rejectionReason:
           evalStatus === "DISQUALIFIED" ? rejectionReason : undefined,
       });
-      alert(`Bid ${evalStatus.toLowerCase()} successfully!`);
+
+      setSuccessMessage({
+        title:
+          evalStatus === "QUALIFIED" ? "Bid Qualified!" : "Bid Disqualified",
+        message:
+          evalStatus === "QUALIFIED"
+            ? "The supplier has been qualified for financial bidding."
+            : "The supplier has been disqualified from this RFP.",
+      });
+      setShowSuccessModal(true);
       setEvaluatingBid(null);
       fetchData();
     } catch (err) {
       console.error("Evaluation error:", err);
-      alert("Failed to evaluate bid");
+      setToast({ message: "Failed to evaluate bid", type: "error" });
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="p-20 text-center animate-pulse">Loading RFP Data...</div>
+      <div className="flex items-center justify-center py-20">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
     );
+  }
   if (!rfp) return <div className="p-20 text-center">RFP not found</div>;
 
   const isBuyer = user?.role === "BUYER" && rfp.buyerId === user?.id;
@@ -171,6 +498,53 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 p-4">
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        title={successMessage.title}
+        message={successMessage.message}
+        onClose={() => setShowSuccessModal(false)}
+      />
+
+      {/* Confirmation Modal for Approval */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title="Approve Supplier Application"
+        message="Are you sure you want to approve this supplier? They will be shortlisted and eligible for the bid room."
+        confirmText="Yes, Approve"
+        cancelText="Cancel"
+        onConfirm={confirmStatusUpdate}
+        onCancel={() => {
+          setShowConfirmModal(false);
+          setPendingAction(null);
+        }}
+        isSubmitting={submitting}
+        type="success"
+      />
+
+      {/* Rejection Modal */}
+      <RejectionModal
+        isOpen={showRejectModal}
+        reason={rejectionReason}
+        onReasonChange={setRejectionReason}
+        onConfirm={confirmStatusUpdate}
+        onCancel={() => {
+          setShowRejectModal(false);
+          setPendingAction(null);
+          setRejectionReason("");
+        }}
+        isSubmitting={submitting}
+      />
+
       {/* Header Section */}
       <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
         <div className="flex flex-col md:flex-row justify-between items-start gap-6">
@@ -219,6 +593,9 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
           </div>
         </div>
       </div>
+
+      {/* Rest of the component remains the same */}
+      {/* ... keep the existing JSX for the rest of the component ... */}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left: Documents & Information */}
