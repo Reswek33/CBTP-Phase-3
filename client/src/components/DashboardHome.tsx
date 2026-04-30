@@ -3,13 +3,23 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { getDashboardStatus } from "@/services/api/status-api";
-import { getAdminDashboardStats, getAnalyticsOverview } from "@/services/api/admin-api";
-import { motion, AnimatePresence } from "framer-motion";
-import { Skeleton, DashboardSkeleton } from "./ui/SkeletonLoader";
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, PieChart, Pie
-} from 'recharts';
+import {
+  getAdminDashboardStats,
+  getAnalyticsOverview,
+} from "@/services/api/admin-api";
+import { motion } from "framer-motion";
+import { DashboardSkeleton } from "./ui/SkeletonLoader";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from "recharts";
 import {
   TrendingUp,
   Users,
@@ -117,7 +127,7 @@ export const DashboardHome = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        
+
         // Fetch base stats
         const response = await getDashboardStatus();
         let combinedData = response.data;
@@ -127,14 +137,14 @@ export const DashboardHome = () => {
           try {
             const [adminStats, analytics] = await Promise.all([
               getAdminDashboardStats(),
-              getAnalyticsOverview()
+              getAnalyticsOverview(),
             ]);
-            
+
             if (adminStats.success) {
               combinedData = {
                 ...combinedData,
                 ...adminStats.data.metrics,
-                recentTransactions: adminStats.data.recentTransactions
+                recentTransactions: adminStats.data.recentTransactions,
               };
             }
             setAnalyticsData(analytics.data);
@@ -159,7 +169,7 @@ export const DashboardHome = () => {
     if (user) {
       fetchStats();
     }
-  }, [user]);
+  }, [user, role]);
 
   if (loading) {
     return (
@@ -213,7 +223,7 @@ export const DashboardHome = () => {
     const data = dashboardData as AdminDashboardData;
 
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="space-y-6"
@@ -221,10 +231,10 @@ export const DashboardHome = () => {
         {/* Welcome Header */}
         <div className="bg-card border border-border rounded-3xl p-8 relative overflow-hidden group shadow-xl shadow-primary/5">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full group-hover:bg-primary/10 transition-all duration-700" />
-          
+
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
             <div className="space-y-2">
-              <motion.h1 
+              <motion.h1
                 initial={{ x: -20 }}
                 animate={{ x: 0 }}
                 className="text-3xl font-black text-foreground tracking-tight"
@@ -232,15 +242,19 @@ export const DashboardHome = () => {
                 Control <span className="text-primary">Center</span>
               </motion.h1>
               <p className="text-muted-foreground font-medium">
-                System health is <span className="text-emerald-500 font-bold">Optimal</span>. All services are operational.
+                System health is{" "}
+                <span className="text-emerald-500 font-bold">Optimal</span>. All
+                services are operational.
               </p>
             </div>
 
             <div className="flex items-center gap-4">
-               <div className="px-6 py-3 bg-background/50 backdrop-blur-md border border-border rounded-2xl flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live Monitoring</span>
-               </div>
+              <div className="px-6 py-3 bg-background/50 backdrop-blur-md border border-border rounded-2xl flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Live Monitoring
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -296,25 +310,66 @@ export const DashboardHome = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-card border border-border rounded-2xl p-6">
               <h3 className="text-sm font-bold mb-6 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" /> User Growth (Last 6 Months)
+                <TrendingUp className="w-4 h-4 text-primary" /> User Growth
+                (Last 6 Months)
               </h3>
               <div className="h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={analyticsData.userGrowth}>
                     <defs>
-                      <linearGradient id="dashColor" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                      <linearGradient
+                        id="dashColor"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#3B82F6"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#3B82F6"
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.1}/>
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', fontSize: '10px' }}
-                      itemStyle={{ color: '#fff' }}
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#334155"
+                      opacity={0.1}
                     />
-                    <Area type="monotone" dataKey="count" stroke="#3B82F6" fillOpacity={1} fill="url(#dashColor)" strokeWidth={3} />
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#1e293b",
+                        border: "none",
+                        borderRadius: "8px",
+                        fontSize: "10px",
+                      }}
+                      itemStyle={{ color: "#fff" }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#3B82F6"
+                      fillOpacity={1}
+                      fill="url(#dashColor)"
+                      strokeWidth={3}
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -327,14 +382,38 @@ export const DashboardHome = () => {
               <div className="h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData.subscriptionTrends}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.1}/>
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} />
-                    <Tooltip 
-                       contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', fontSize: '10px' }}
-                       itemStyle={{ color: '#fff' }}
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#334155"
+                      opacity={0.1}
                     />
-                    <Bar dataKey="revenue" fill="#F59E0B" radius={[4, 4, 0, 0]} barSize={30} />
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#1e293b",
+                        border: "none",
+                        borderRadius: "8px",
+                        fontSize: "10px",
+                      }}
+                      itemStyle={{ color: "#fff" }}
+                    />
+                    <Bar
+                      dataKey="revenue"
+                      fill="#F59E0B"
+                      radius={[4, 4, 0, 0]}
+                      barSize={30}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -393,7 +472,7 @@ export const DashboardHome = () => {
     const isPending = user?.supplier?.status === "PENDING";
 
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="space-y-6"
@@ -401,41 +480,54 @@ export const DashboardHome = () => {
         {/* Welcome Header with Onboarding */}
         <div className="bg-card border border-border rounded-3xl p-8 relative overflow-hidden group shadow-xl shadow-primary/5">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full group-hover:bg-primary/10 transition-all duration-700" />
-          
+
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
             <div className="space-y-2">
               <div className="flex items-center gap-4 mb-2">
-                <motion.h1 
+                <motion.h1
                   initial={{ x: -20 }}
                   animate={{ x: 0 }}
                   className="text-3xl font-black text-foreground tracking-tight"
                 >
-                  Welcome back, <span className="text-primary">{user?.firstName}!</span> 👋
+                  Welcome back,{" "}
+                  <span className="text-primary">{user?.firstName}!</span> 👋
                 </motion.h1>
                 {isPending ? (
                   <div className="flex items-center gap-2 px-3 py-1 bg-destructive/20 rounded-lg border border-destructive/30">
                     <AlertCircle className="w-4 h-4 text-destructive" />
-                    <span className="text-[10px] font-bold text-destructive uppercase">PENDING</span>
+                    <span className="text-[10px] font-bold text-destructive uppercase">
+                      PENDING
+                    </span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 rounded-lg border border-green-500/30">
                     <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-[10px] font-bold text-green-500 uppercase">VERIFIED</span>
+                    <span className="text-[10px] font-bold text-green-500 uppercase">
+                      VERIFIED
+                    </span>
                   </div>
                 )}
               </div>
               <p className="text-muted-foreground font-medium">
-                You have <span className="text-foreground font-bold">{data.activeBids} active bids</span> requiring attention today.
+                You have{" "}
+                <span className="text-foreground font-bold">
+                  {data.activeBids} active bids
+                </span>{" "}
+                requiring attention today.
               </p>
             </div>
 
             <div className="bg-background/50 backdrop-blur-md border border-border p-5 rounded-2xl w-full md:w-72 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Setup Progress</span>
-                <span className="text-xs font-bold text-primary">{getOnboardingProgress()}%</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Setup Progress
+                </span>
+                <span className="text-xs font-bold text-primary">
+                  {getOnboardingProgress()}%
+                </span>
               </div>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${getOnboardingProgress()}%` }}
                   transition={{ duration: 1.5, ease: "easeOut" }}
@@ -443,7 +535,9 @@ export const DashboardHome = () => {
                 />
               </div>
               <p className="text-[10px] text-muted-foreground mt-3 font-medium">
-                {getOnboardingProgress() < 100 ? "Complete your profile to unlock full features." : "You're all set! Ready for more bids?"}
+                {getOnboardingProgress() < 100
+                  ? "Complete your profile to unlock full features."
+                  : "You're all set! Ready for more bids?"}
               </p>
             </div>
           </div>
@@ -456,8 +550,12 @@ export const DashboardHome = () => {
                 <AlertCircle className="w-6 h-6 text-destructive" />
               </div>
               <div>
-                <p className="text-sm font-bold text-foreground">Action Required: Verification Pending</p>
-                <p className="text-xs text-muted-foreground">Complete your onboarding to start bidding on RFPs.</p>
+                <p className="text-sm font-bold text-foreground">
+                  Action Required: Verification Pending
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Complete your onboarding to start bidding on RFPs.
+                </p>
               </div>
             </div>
             <Link
@@ -540,7 +638,7 @@ export const DashboardHome = () => {
     const data = dashboardData as BuyerDashboardData;
 
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="space-y-6"
@@ -548,10 +646,10 @@ export const DashboardHome = () => {
         {/* Welcome Header with Onboarding */}
         <div className="bg-card border border-border rounded-3xl p-8 relative overflow-hidden group shadow-xl shadow-primary/5">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full group-hover:bg-primary/10 transition-all duration-700" />
-          
+
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
             <div className="space-y-2">
-              <motion.h1 
+              <motion.h1
                 initial={{ x: -20 }}
                 animate={{ x: 0 }}
                 className="text-3xl font-black text-foreground tracking-tight"
@@ -559,17 +657,25 @@ export const DashboardHome = () => {
                 {user?.buyer?.companyName || "Buyer Console"}
               </motion.h1>
               <p className="text-muted-foreground font-medium">
-                You have <span className="text-foreground font-bold">{data.openRfpsCount} open RFPs</span> active in the market.
+                You have{" "}
+                <span className="text-foreground font-bold">
+                  {data.openRfpsCount} open RFPs
+                </span>{" "}
+                active in the market.
               </p>
             </div>
 
             <div className="bg-background/50 backdrop-blur-md border border-border p-5 rounded-2xl w-full md:w-72 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Setup Progress</span>
-                <span className="text-xs font-bold text-primary">{getOnboardingProgress()}%</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Setup Progress
+                </span>
+                <span className="text-xs font-bold text-primary">
+                  {getOnboardingProgress()}%
+                </span>
               </div>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${getOnboardingProgress()}%` }}
                   transition={{ duration: 1.5, ease: "easeOut" }}
@@ -577,7 +683,9 @@ export const DashboardHome = () => {
                 />
               </div>
               <p className="text-[10px] text-muted-foreground mt-3 font-medium">
-                {getOnboardingProgress() < 100 ? "Start a new RFP to complete your setup." : "Strategic procurement is in progress!"}
+                {getOnboardingProgress() < 100
+                  ? "Start a new RFP to complete your setup."
+                  : "Strategic procurement is in progress!"}
               </p>
             </div>
           </div>
@@ -639,12 +747,14 @@ export const DashboardHome = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-             <BidActivityCard 
-               bids={data.recentBids?.map(bid => ({
-                 ...bid,
-                 time: formatDate(bid.time)
-               })) || []}
-             />
+            <BidActivityCard
+              bids={
+                data.recentBids?.map((bid) => ({
+                  ...bid,
+                  time: formatDate(bid.time),
+                })) || []
+              }
+            />
           </div>
           <QuickActionsCard role="buyer" />
         </div>
@@ -660,8 +770,7 @@ export const DashboardHome = () => {
   );
 };
 
-// --- Sub-Components ---
-
+// --- Sub-Components --- (Rest of the components remain the same)
 interface StatCardProps {
   title: string;
   value: string | number;
@@ -704,8 +813,12 @@ const StatCard: React.FC<StatCardProps> = ({
             {icon}
           </div>
         </div>
-        <p className="text-4xl font-black text-foreground mb-1 tracking-tight">{value}</p>
-        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{title}</p>
+        <p className="text-4xl font-black text-foreground mb-1 tracking-tight">
+          {value}
+        </p>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          {title}
+        </p>
       </Link>
     </motion.div>
   );
@@ -731,7 +844,9 @@ const RecentActivityCard: React.FC<{ activities: ActivityItem[] }> = ({
       {activities.length === 0 ? (
         <div className="text-center py-12">
           <Activity className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
-          <p className="text-muted-foreground text-sm font-medium">Monitoring system pulses...</p>
+          <p className="text-muted-foreground text-sm font-medium">
+            Monitoring system pulses...
+          </p>
         </div>
       ) : (
         activities.map((activity, idx) => (
@@ -752,8 +867,12 @@ const RecentActivityCard: React.FC<{ activities: ActivityItem[] }> = ({
               }`}
             />
             <div className="flex-1">
-              <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{activity.action}</p>
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-tighter opacity-70">{activity.time}</p>
+              <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
+                {activity.action}
+              </p>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-tighter opacity-70">
+                {activity.time}
+              </p>
             </div>
           </motion.div>
         ))
@@ -776,7 +895,9 @@ const TopPerformersCard: React.FC<{ performers: PerformerItem[] }> = ({
       {performers.length === 0 ? (
         <div className="text-center py-12">
           <Award className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
-          <p className="text-muted-foreground text-sm font-medium">No performance data yet</p>
+          <p className="text-muted-foreground text-sm font-medium">
+            No performance data yet
+          </p>
         </div>
       ) : (
         performers.map((performer, idx) => (
@@ -805,7 +926,9 @@ const TopPerformersCard: React.FC<{ performers: PerformerItem[] }> = ({
                 <TrendingUp className="w-4 h-4" />
                 {performer.winRate}%
               </div>
-              <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">Win Velocity</p>
+              <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">
+                Win Velocity
+              </p>
             </div>
           </motion.div>
         ))
@@ -1107,7 +1230,9 @@ const QuickActionsCard: React.FC<{ role: string }> = ({ role }) => {
   );
 };
 
-const RecentTransactionsCard: React.FC<{ transactions: any[] }> = ({ transactions }) => (
+const RecentTransactionsCard: React.FC<{ transactions: any[] }> = ({
+  transactions,
+}) => (
   <div className="bg-card border border-border rounded-2xl p-6">
     <div className="flex items-center justify-between mb-4">
       <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -1134,7 +1259,10 @@ const RecentTransactionsCard: React.FC<{ transactions: any[] }> = ({ transaction
         <tbody className="divide-y divide-border">
           {transactions.length === 0 ? (
             <tr>
-              <td colSpan={4} className="py-8 text-center text-muted-foreground">
+              <td
+                colSpan={4}
+                className="py-8 text-center text-muted-foreground"
+              >
                 No recent transactions
               </td>
             </tr>
@@ -1143,17 +1271,25 @@ const RecentTransactionsCard: React.FC<{ transactions: any[] }> = ({ transaction
               <tr key={tx.id} className="hover:bg-muted/30 transition-colors">
                 <td className="py-3 text-left">
                   <div className="flex flex-col">
-                    <span className="font-medium text-foreground">{tx.user?.firstName} {tx.user?.lastName}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase">{tx.plan?.name}</span>
+                    <span className="font-medium text-foreground">
+                      {tx.user?.firstName} {tx.user?.lastName}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground uppercase">
+                      {tx.plan?.name}
+                    </span>
                   </div>
                 </td>
                 <td className="py-3 text-right font-mono font-bold text-emerald-500">
                   {parseFloat(tx.amount).toLocaleString()} {tx.currency}
                 </td>
                 <td className="py-3 text-center">
-                  <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-                    tx.status === 'SUCCESS' ? 'bg-green-500/20 text-green-500' : 'bg-amber-500/20 text-amber-500'
-                  }`}>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                      tx.status === "SUCCESS"
+                        ? "bg-green-500/20 text-green-500"
+                        : "bg-amber-500/20 text-amber-500"
+                    }`}
+                  >
                     {tx.status}
                   </span>
                 </td>
