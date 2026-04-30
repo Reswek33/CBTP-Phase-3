@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useState } from "react";
 import { getTransactions } from "@/services/api/admin-api";
 import {
   Table,
@@ -9,7 +10,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, Calendar, User, Search, Download, CheckCircle, XCircle, Clock } from "lucide-react";
+import {
+  DollarSign,
+  Calendar,
+  Search,
+  Download,
+  CheckCircle,
+  XCircle,
+  Clock,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,7 +48,7 @@ const Transactions = () => {
     (tx) =>
       tx.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.txRef?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.plan?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      tx.plan?.name?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const getStatusColor = (status: string) => {
@@ -69,14 +78,16 @@ const Transactions = () => {
   };
 
   const totalRevenue = transactions
-    .filter(tx => tx.status === 'SUCCESS')
+    .filter((tx) => tx.status === "SUCCESS")
     .reduce((acc, tx) => acc + parseFloat(tx.amount), 0);
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-sm font-mono text-muted-foreground">LOADING_TRANSACTIONS...</p>
+        <p className="text-sm font-mono text-muted-foreground">
+          LOADING_TRANSACTIONS...
+        </p>
       </div>
     );
   }
@@ -104,7 +115,10 @@ const Transactions = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" className="h-11 rounded-xl border-border bg-card gap-2">
+          <Button
+            variant="outline"
+            className="h-11 rounded-xl border-border bg-card gap-2"
+          >
             <Download className="w-4 h-4" />
             Export
           </Button>
@@ -113,9 +127,9 @@ const Transactions = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-card border-border overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-3 opacity-10">
-                <DollarSign size={48} className="text-green-500" />
-            </div>
+          <div className="absolute top-0 right-0 p-3 opacity-10">
+            <DollarSign size={48} className="text-green-500" />
+          </div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Revenue
@@ -123,7 +137,8 @@ const Transactions = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-black text-green-500">
-                {totalRevenue.toLocaleString()} <span className="text-xs font-mono">ETB</span>
+              {totalRevenue.toLocaleString()}{" "}
+              <span className="text-xs font-mono">ETB</span>
             </div>
           </CardContent>
         </Card>
@@ -134,7 +149,9 @@ const Transactions = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{transactions.filter(tx => tx.status === 'SUCCESS').length}</div>
+            <div className="text-2xl font-bold">
+              {transactions.filter((tx) => tx.status === "SUCCESS").length}
+            </div>
           </CardContent>
         </Card>
         <Card className="bg-card border-border overflow-hidden">
@@ -144,7 +161,9 @@ const Transactions = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{transactions.filter(tx => tx.status === 'FAILED').length}</div>
+            <div className="text-2xl font-bold">
+              {transactions.filter((tx) => tx.status === "FAILED").length}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -164,13 +183,19 @@ const Transactions = () => {
           <TableBody>
             {filteredTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={6}
+                  className="h-40 text-center text-muted-foreground"
+                >
                   No transactions found matching your criteria.
                 </TableCell>
               </TableRow>
             ) : (
               filteredTransactions.map((tx) => (
-                <TableRow key={tx.id} className="hover:bg-muted/30 transition-colors border-border">
+                <TableRow
+                  key={tx.id}
+                  className="hover:bg-muted/30 transition-colors border-border"
+                >
                   <TableCell>
                     <code className="text-xs font-mono text-primary font-bold">
                       {tx.txRef}
@@ -179,8 +204,12 @@ const Transactions = () => {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div>
-                        <p className="font-medium text-sm">{tx.user?.firstName} {tx.user?.lastName}</p>
-                        <p className="text-xs text-muted-foreground">{tx.user?.email}</p>
+                        <p className="font-medium text-sm">
+                          {tx.user?.firstName} {tx.user?.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {tx.user?.email}
+                        </p>
                       </div>
                     </div>
                   </TableCell>
@@ -193,7 +222,9 @@ const Transactions = () => {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <Badge className={`${getStatusColor(tx.status)} flex items-center w-fit`}>
+                    <Badge
+                      className={`${getStatusColor(tx.status)} flex items-center w-fit`}
+                    >
                       {getStatusIcon(tx.status)}
                       {tx.status}
                     </Badge>
