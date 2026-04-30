@@ -5,6 +5,7 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     role: string;
+    adminRole?: string;
   };
 }
 
@@ -66,6 +67,27 @@ export const requireRole = (roles: string[]) => {
       return res.status(403).json({
         success: false,
         message: "Insufficient permissions",
+      });
+    }
+
+    next();
+  };
+};
+export const requireAdminRole = (adminRoles: string[]) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    if (req.user.role === "SUPERADMIN") return next();
+
+    if (!req.user.adminRole || !adminRoles.includes(req.user.adminRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Insufficient administrative permissions",
       });
     }
 
