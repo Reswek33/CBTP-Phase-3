@@ -45,11 +45,13 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
   const [proposalText, setProposalText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [amount, setAmount] = useState<number>(0);
-  
+
   // Evaluation States
   const [evaluatingBid, setEvaluatingBid] = useState<any>(null);
   const [technicalScore, setTechnicalScore] = useState(0);
-  const [evalStatus, setEvalStatus] = useState<"QUALIFIED" | "DISQUALIFIED">("QUALIFIED");
+  const [evalStatus, setEvalStatus] = useState<"QUALIFIED" | "DISQUALIFIED">(
+    "QUALIFIED",
+  );
   const [rejectionReason, setRejectionReason] = useState("");
 
   const socket = useSocket();
@@ -255,7 +257,8 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                   {rfp.workflow === "TWO_ENVELOPE" && (
                     <p className="text-[10px] text-amber-600 mt-2 flex items-center gap-1 font-medium">
                       <Shield className="w-3 h-3" /> Two-Envelope System: Your
-                      financial bid remains locked until technical qualification.
+                      financial bid remains locked until technical
+                      qualification.
                     </p>
                   )}
                 </div>
@@ -359,55 +362,66 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                           <Eye className="w-3 h-3" /> View Proposal
                         </a>
 
-                        {bid.status === "PENDING_APPROVAL" && rfp.workflow !== "TWO_ENVELOPE" && (
-                          <>
-                            <button
-                              onClick={() => handleStatusUpdate(bid.id, "ACTIVE")}
-                              className="p-2 bg-green-500/10 text-green-600 rounded-lg hover:bg-green-500/20"
-                              title="Shortlist for Bid Room"
-                            >
-                              <UserCheck className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleStatusUpdate(bid.id, "REJECTED")
-                              }
-                              className="p-2 bg-red-500/10 text-red-600 rounded-lg hover:bg-red-500/20"
-                              title="Reject Proposal"
-                            >
-                              <UserX className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
+                        {bid.status === "PENDING_APPROVAL" &&
+                          rfp.workflow !== "TWO_ENVELOPE" && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  handleStatusUpdate(bid.id, "ACTIVE")
+                                }
+                                className="p-2 bg-green-500/10 text-green-600 rounded-lg hover:bg-green-500/20"
+                                title="Shortlist for Bid Room"
+                              >
+                                <UserCheck className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleStatusUpdate(bid.id, "REJECTED")
+                                }
+                                className="p-2 bg-red-500/10 text-red-600 rounded-lg hover:bg-red-500/20"
+                                title="Reject Proposal"
+                              >
+                                <UserX className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                       </div>
 
-                      {rfp.workflow === "TWO_ENVELOPE" && bid.technicalStatus === "PENDING" && (
-                        <button
-                          onClick={() => setEvaluatingBid(bid)}
-                          className="w-full flex items-center justify-center gap-2 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors"
-                        >
-                          <Shield className="w-3 h-3" /> Score & Evaluate Technical Proposal
-                        </button>
-                      )}
+                      {rfp.workflow === "TWO_ENVELOPE" &&
+                        bid.technicalStatus === "PENDING" && (
+                          <button
+                            onClick={() => setEvaluatingBid(bid)}
+                            className="w-full flex items-center justify-center gap-2 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors"
+                          >
+                            <Shield className="w-3 h-3" /> Score & Evaluate
+                            Technical Proposal
+                          </button>
+                        )}
 
                       {bid.technicalStatus !== "PENDING" && (
-                        <div className={`text-center py-1.5 rounded-lg text-[10px] font-bold uppercase ${
-                          bid.technicalStatus === "QUALIFIED" ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
-                        }`}>
-                          Technical: {bid.technicalStatus} ({bid.technicalScore}/100)
+                        <div
+                          className={`text-center py-1.5 rounded-lg text-[10px] font-bold uppercase ${
+                            bid.technicalStatus === "QUALIFIED"
+                              ? "bg-green-500/10 text-green-600"
+                              : "bg-red-500/10 text-red-600"
+                          }`}
+                        >
+                          Technical: {bid.technicalStatus} ({bid.technicalScore}
+                          /100)
                         </div>
                       )}
-                      
+
                       {bid.technicalStatus === "QUALIFIED" && !bid.amount && (
-                         <div className="text-center py-1 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
-                            WAITING FOR FINANCIAL SUBMISSION
-                         </div>
+                        <div className="text-center py-1 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+                          WAITING FOR FINANCIAL SUBMISSION
+                        </div>
                       )}
-                      
+
                       {bid.amount && (
-                         <div className="text-center py-1 rounded bg-green-100 text-green-800 text-sm font-bold flex items-center justify-center gap-1">
-                            <DollarSign className="w-3 h-3" /> {bid.amount} {rfp.currency}
-                         </div>
+                        <div className="text-center py-1 rounded bg-green-100 text-green-800 text-sm font-bold flex items-center justify-center gap-1">
+                          <DollarSign className="w-3 h-3" /> {bid.amount}{" "}
+                          {rfp.currency}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -466,7 +480,8 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
             <div className="p-6 border-b border-border bg-muted/30">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-primary" /> Technical Evaluation
+                  <Shield className="w-5 h-5 text-primary" /> Technical
+                  Evaluation
                 </h3>
                 <button
                   onClick={() => setEvaluatingBid(null)}
@@ -553,7 +568,7 @@ export const RfpDetail = ({ rfpId }: { rfpId: string }) => {
                   submitting ||
                   (evalStatus === "DISQUALIFIED" && !rejectionReason)
                 }
-                className="flex-[2] py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20"
+                className="flex-2 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20"
               >
                 {submitting ? "Processing..." : "Submit Evaluation"}
               </button>

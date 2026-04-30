@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import { getAllUsers, createAdmin } from "../services/api/admin-api";
 import { useAuth } from "../contexts/AuthContext";
@@ -183,8 +184,9 @@ export const UserManagement = () => {
     total: users.length,
     suppliers: users.filter((u: User) => u.role === "SUPPLIER").length,
     buyers: users.filter((u: User) => u.role === "BUYER").length,
-    admins: users.filter((u: User) => u.role === "ADMIN" || u.role === "SUPERADMIN")
-      .length,
+    admins: users.filter(
+      (u: User) => u.role === "ADMIN" || u.role === "SUPERADMIN",
+    ).length,
     pending: pendingBuyers + pendingSuppliers,
     verified: verifiedBuyers + verifiedSuppliers,
   };
@@ -236,85 +238,123 @@ export const UserManagement = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold">Register New Admin</h3>
-                  <p className="text-xs text-muted-foreground">Grant system-wide administrative access</p>
+                  <p className="text-xs text-muted-foreground">
+                    Grant system-wide administrative access
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-muted rounded-lg transition-colors">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 hover:bg-muted rounded-lg transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              setIsSubmitting(true);
-              try {
-                const res = await createAdmin(newAdmin);
-                if (res.success) {
-                  toast.success(`Admin ${newAdmin.username} created successfully`);
-                  setIsModalOpen(false);
-                  setNewAdmin({ firstName: "", lastName: "", username: "", email: "", password: "" });
-                  loadData();
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setIsSubmitting(true);
+                try {
+                  const res = await createAdmin(newAdmin);
+                  if (res.success) {
+                    toast.success(
+                      `Admin ${newAdmin.username} created successfully`,
+                    );
+                    setIsModalOpen(false);
+                    setNewAdmin({
+                      firstName: "",
+                      lastName: "",
+                      username: "",
+                      email: "",
+                      password: "",
+                    });
+                    loadData();
+                  }
+                } catch (err: any) {
+                  toast.error(
+                    err.response?.data?.message || "Failed to create admin",
+                  );
+                } finally {
+                  setIsSubmitting(false);
                 }
-              } catch (err: any) {
-                toast.error(err.response?.data?.message || "Failed to create admin");
-              } finally {
-                setIsSubmitting(false);
-              }
-            }} className="p-6 space-y-4">
+              }}
+              className="p-6 space-y-4"
+            >
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-mono text-muted-foreground uppercase">First Name</label>
+                  <label className="text-xs font-mono text-muted-foreground uppercase">
+                    First Name
+                  </label>
                   <input
                     required
                     type="text"
                     value={newAdmin.firstName}
-                    onChange={(e) => setNewAdmin({ ...newAdmin, firstName: e.target.value })}
+                    onChange={(e) =>
+                      setNewAdmin({ ...newAdmin, firstName: e.target.value })
+                    }
                     className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-mono text-muted-foreground uppercase">Last Name</label>
+                  <label className="text-xs font-mono text-muted-foreground uppercase">
+                    Last Name
+                  </label>
                   <input
                     required
                     type="text"
                     value={newAdmin.lastName}
-                    onChange={(e) => setNewAdmin({ ...newAdmin, lastName: e.target.value })}
+                    onChange={(e) =>
+                      setNewAdmin({ ...newAdmin, lastName: e.target.value })
+                    }
                     className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-mono text-muted-foreground uppercase">Username</label>
+                <label className="text-xs font-mono text-muted-foreground uppercase">
+                  Username
+                </label>
                 <input
                   required
                   type="text"
                   value={newAdmin.username}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, username: e.target.value })}
+                  onChange={(e) =>
+                    setNewAdmin({ ...newAdmin, username: e.target.value })
+                  }
                   className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-mono text-muted-foreground uppercase">Email Address</label>
+                <label className="text-xs font-mono text-muted-foreground uppercase">
+                  Email Address
+                </label>
                 <input
                   required
                   type="email"
                   value={newAdmin.email}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
+                  onChange={(e) =>
+                    setNewAdmin({ ...newAdmin, email: e.target.value })
+                  }
                   className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-mono text-muted-foreground uppercase">Initial Password</label>
+                <label className="text-xs font-mono text-muted-foreground uppercase">
+                  Initial Password
+                </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     required
                     type="password"
                     value={newAdmin.password}
-                    onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+                    onChange={(e) =>
+                      setNewAdmin({ ...newAdmin, password: e.target.value })
+                    }
                     className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all"
                   />
                 </div>
@@ -615,10 +655,11 @@ export const UserManagement = () => {
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1 rounded-lg text-sm transition-colors ${currentPage === pageNum
+                      className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                        currentPage === pageNum
                           ? "bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:bg-muted"
-                        }`}
+                      }`}
                     >
                       {pageNum}
                     </button>
