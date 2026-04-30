@@ -19,6 +19,7 @@ import statsRoute from "./modules/status/stats.route.js";
 import userRoutes from "./modules/user/user.route.js";
 import bidRoomRoutes from "./modules/bidroom/bidroom.route.js";
 import subscriptionRoutes from "./modules/subscription/subscription.route.js";
+import disputeRoutes from "./modules/dispute/dispute.route.js";
 
 import { initSocket } from "./config/socket.js";
 import path, { dirname } from "node:path";
@@ -87,6 +88,7 @@ app.use(`${API_PREFIX}/stats`, statsRoute);
 app.use(`${API_PREFIX}/users`, userRoutes);
 app.use(`${API_PREFIX}/rooms`, bidRoomRoutes);
 app.use(`${API_PREFIX}/subscription`, subscriptionRoutes);
+app.use(`${API_PREFIX}/disputes`, disputeRoutes);
 
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({
