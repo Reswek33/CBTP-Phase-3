@@ -9,6 +9,7 @@ import {
   updateBidAmount,
   joinRoom,
   startRoom,
+  awardBidById,
 } from "@/services/api/bidroom-api";
 import { BidTimer } from "./BidTimer";
 import { BidHistory } from "./BidHistory";
@@ -39,17 +40,20 @@ export const BidRoomDetail: React.FC = () => {
   const isBuyer = user?.role === "BUYER";
   const isSupplier = user?.role === "SUPPLIER";
 
-  const fetchRoom = useCallback(async (isInitial = false) => {
-    try {
-      if (isInitial) setLoading(true);
-      const response = await getRoomDetail(id!);
-      setRoom(response.data);
-    } catch (error) {
-      console.error("Failed to load room:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const fetchRoom = useCallback(
+    async (isInitial = false) => {
+      try {
+        if (isInitial) setLoading(true);
+        const response = await getRoomDetail(id!);
+        setRoom(response.data);
+      } catch (error) {
+        console.error("Failed to load room:", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [id],
+  );
 
   useEffect(() => {
     fetchRoom(true);
