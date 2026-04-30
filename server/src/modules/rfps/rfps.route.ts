@@ -1,28 +1,17 @@
 import { Router } from "express";
-import {
-  authenticateUser,
-  requireRole,
-} from "../../shared/middleware/authMiddleware.js";
 import { rfpsController } from "./rfps.controller.js";
-import { upload } from "../../config/multer.js";
+import { authenticateUser, requireRole } from "../../shared/middleware/authMiddleware.js";
+import { requireSubscription } from "../../shared/middleware/subscriptionMiddleware.js";
+import multer from "multer";
 
 const router = Router();
+const upload = multer({ dest: "uploads/" });
 
-router.get("/", rfpsController.list);
-
-router.get(
-  "/my-rfps",
-  authenticateUser,
-  requireRole(["BUYER"]),
-  rfpsController.listMyRfps,
-);
-
-router.get("/:id", rfpsController.listById);
-
-router
-  .use(authenticateUser, requireRole(["BUYER"]))
-  .post("/", upload.single("rfp_doc"), rfpsController.create)
-  .patch("/:rfpId", rfpsController.cancelRfp)
-  .delete("/:rfpId/delete", rfpsController.delete);
+router.post("/", authenticateUser, requireRole(["BUYER"]), requireSubscription, upload.single("documents"), rfpsController.create);
+router.get("/", authenticateUser, rfpsController.list);
+router.get("/my-rfps", authenticateUser, requireRole(["BUYER"]), rfpsController.listMyRfps);
+router.get("/:id", authenticateUser, rfpsController.listById);
+router.patch("/:rfpId/cancel", authenticateUser, requireRole(["BUYER"]), rfpsController.cancelRfp);
+router.delete("/:rfpId", authenticateUser, requireRole(["BUYER"]), rfpsController.delete);
 
 export default router;
