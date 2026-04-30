@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const RfpPriority = ["NORMAL", "URGENT"] as const;
+const RfpPriority = ["NORMAL", "URGENT", "HIGH"] as const;
 const RfpStatus = ["OPEN", "CLOSED", "AWARDED", "CANCELLED"] as const;
 const RfpWorkflow = ["STANDARD", "TWO_ENVELOPE"] as const;
 
