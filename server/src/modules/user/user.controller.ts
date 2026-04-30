@@ -7,7 +7,20 @@ import { prisma } from "../../config/prisma.js";
 const updateUserInputSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
-  email: z.email().optional(),
+  email: z.string().email().optional(),
+  // Buyer fields
+  companyName: z.string().optional(),
+  companyType: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  industrySector: z.string().optional(),
+  department: z.string().optional(),
+  position: z.string().optional(),
+  // Supplier fields
+  businessName: z.string().optional(),
+  businessType: z.string().optional(),
+  bio: z.string().optional(),
+  categories: z.array(z.string()).optional(),
 });
 const updateUserNameInputSchema = z.object({
   username: z
@@ -19,35 +32,53 @@ export type UserUpdateInput = z.infer<typeof updateUserInputSchema>;
 
 export const userController = {
   updateProfile: async (req: AuthenticatedRequest, res: Response) => {
-    const { id } = req.user!;
+    const { id, role } = req.user!;
     try {
-      const { firstName, lastName, email } = updateUserInputSchema.parse(
-        req.body,
-      );
+      const data = updateUserInputSchema.parse(req.body);
 
-      const user = prisma.user.findUnique({
-        where: { id: id },
-      });
-
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
+      await prisma.$transaction(async (tx) => {
+        // Update basic user info
+        await tx.user.update({
+          where: { id },
+          data: {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+          },
         });
-      }
 
-      await prisma.user.update({
-        where: { id: id },
-        data: {
-          firstName: firstName,
-          lastName: lastName,
-          email: email,
-        },
+        // Update role-specific info
+        if (role === "BUYER") {
+          await tx.buyer.update({
+            where: { id },
+            data: {
+              companyName: data.companyName,
+              companyType: data.companyType,
+              phone: data.phone,
+              address: data.address,
+              industrySector: data.industrySector,
+              department: data.department,
+              position: data.position,
+            },
+          });
+        } else if (role === "SUPPLIER") {
+          await tx.supplier.update({
+            where: { id },
+            data: {
+              businessName: data.businessName,
+              businessType: data.businessType,
+              phone: data.phone,
+              address: data.address,
+              bio: data.bio,
+              categories: data.categories,
+            },
+          });
+        }
       });
 
       return res.status(200).json({
         success: true,
-        message: "Updated Successfully",
+        message: "Profile updated successfully",
       });
     } catch (err) {
       console.error("[USER_CONTROLLER_UPDATE_PROFILE]", err);

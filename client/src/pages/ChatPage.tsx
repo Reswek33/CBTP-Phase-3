@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useSocket } from "../contexts/SocketContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useUi } from "../contexts/UiContext";
 import {
   getMessages,
   getUserConversations,
@@ -152,6 +153,7 @@ export const ChatPage: React.FC = () => {
   const [markingAsRead, setMarkingAsRead] = useState(false);
   const { user } = useAuth();
   const socket = useSocket();
+  const { toast } = useUi();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -214,17 +216,13 @@ export const ChatPage: React.FC = () => {
           ),
         );
 
-        // Emit socket event to update other clients
-        if (socket) {
-          socket.emit("mark_messages_read", { conversationId });
-        }
       } catch (err) {
         console.error("Failed to mark messages as read", err);
       } finally {
         setMarkingAsRead(false);
       }
     },
-    [messages, user, socket, markingAsRead],
+    [messages, user, markingAsRead],
   );
 
   // Trigger mark as read when active chat changes or new messages arrive
@@ -423,7 +421,7 @@ export const ChatPage: React.FC = () => {
       // Remove temp message on error
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
       setInput(tempInput);
-      alert("Failed to send message. Please try again.");
+      toast.error("Failed to send message. Please try again.");
     } finally {
       setSending(false);
       inputRef.current?.focus();

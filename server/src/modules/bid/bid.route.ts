@@ -1,51 +1,21 @@
 import { Router } from "express";
 import { bidController } from "./bid.controller.js";
-import {
-  authenticateUser,
-  requireRole,
-} from "../../shared/middleware/authMiddleware.js";
-import { upload } from "../../config/multer.js";
+import { authenticateUser, requireRole } from "../../shared/middleware/authMiddleware.js";
+import { requireSubscription } from "../../shared/middleware/subscriptionMiddleware.js";
+import multer from "multer";
 
 const router = Router();
+const upload = multer({ dest: "uploads/" });
 
-// Apply authentication to all routes
-router.use(authenticateUser);
-
-// Supplier routes
-router.route("/:rfpId").post(requireRole(["SUPPLIER"]), bidController.create);
-
-router
-  .route("/:bidId/submit-amount")
-  .patch(requireRole(["SUPPLIER"]), bidController.submitFinancialBid);
-
-router
-  .route("/apply/:rfpId")
-  .post(
-    requireRole(["SUPPLIER"]),
-    upload.single("proposalFile"),
-    bidController.applyToBid,
-  );
-
-// Buyer/Admin routes
-router
-  .route("/:bidId/status")
-  .patch(
-    requireRole(["BUYER", "ADMIN"]),
-    bidController.updateApplicationStatus,
-  );
-
-router
-  .route("/:bidId/award")
-  .patch(requireRole(["BUYER"]), bidController.awardBid);
-
-router
-  .route("/:bidId/withdraw")
-  .patch(requireRole(["SUPPLIER"]), requireRole(["SUPPLIER"]));
-// Multi-role routes
-router
-  .route("/")
-  .get(requireRole(["BUYER", "SUPPLIER", "ADMIN"]), bidController.getBids);
-
-router.route("/:id").get(bidController.getBidById);
+router.post("/:rfpId", authenticateUser, requireRole(["SUPPLIER"]), requireSubscription, upload.single("proposalFile"), bidController.create);
+router.get("/", authenticateUser, bidController.getBids);
+router.get("/:id", authenticateUser, bidController.getBidById);
+router.post("/award/:bidId", authenticateUser, requireRole(["BUYER"]), bidController.awardBid);
+router.post("/:bidId/submit-amount", authenticateUser, requireRole(["SUPPLIER"]), bidController.submitFinancialBid);
+router.post("/apply/:rfpId", authenticateUser, requireRole(["SUPPLIER"]), requireSubscription, upload.single("proposalFile"), bidController.applyToBid);
+router.post("/:rfpId/reapply", authenticateUser, requireRole(["SUPPLIER"]), upload.single("proposalFile"), bidController.reapplyToBid);
+router.patch("/:bidId/status", authenticateUser, requireRole(["BUYER"]), bidController.updateApplicationStatus);
+router.patch("/:bidId/technical", authenticateUser, requireRole(["BUYER"]), bidController.evaluateTechnicalBid);
+router.patch("/:bidId/withdraw", authenticateUser, requireRole(["SUPPLIER"]), bidController.withdrawBid);
 
 export default router;

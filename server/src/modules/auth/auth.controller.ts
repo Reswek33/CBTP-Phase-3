@@ -310,7 +310,7 @@ export const authController = {
         return user;
       });
 
-      const tokens = generateTokens(result.id, result.role);
+      const tokens = generateTokens(result.id, result.role, result.adminRole);
       setAuthCookies(res, {
         refreshToken: tokens.refreshToken,
         accessToken: tokens.accessToken,
@@ -368,6 +368,7 @@ export const authController = {
           id: true,
           passwordHash: true,
           role: true,
+          adminRole: true,
           isActive: true,
         },
       });
@@ -413,7 +414,7 @@ export const authController = {
       }
 
       // 6. Generate Session and Log Success
-      const tokens = generateTokens(user.id, user.role);
+      const tokens = generateTokens(user.id, user.role, user.adminRole);
       setAuthCookies(res, {
         refreshToken: tokens.refreshToken,
         accessToken: tokens.accessToken,
@@ -650,7 +651,7 @@ export const authController = {
       const { id } = decoded as { id: string };
       const user = await prisma.user.findFirst({
         where: { id, isActive: true },
-        select: { id: true, role: true },
+        select: { id: true, role: true, adminRole: true },
       });
 
       if (!user) {
@@ -659,7 +660,7 @@ export const authController = {
           .json({ message: "User is inactive or not found" });
       }
 
-      const newTokens = generateTokens(user.id, user.role);
+      const newTokens = generateTokens(user.id, user.role, user.adminRole);
       setAuthCookies(res, {
         accessToken: newTokens.accessToken,
         refreshToken: newTokens.refreshToken,

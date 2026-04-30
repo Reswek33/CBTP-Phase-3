@@ -99,10 +99,30 @@ export const bidController = {
       const bids = await prisma.bid.findMany({
         where: whereClause,
         include: {
-          rfp: { select: { title: true, status: true, deadline: true } },
+          rfp: {
+            select: {
+              title: true,
+              status: true,
+              deadline: true,
+              workflow: true,
+            },
+          },
           supplier: { select: { businessName: true, status: true } },
         },
         orderBy: { createdAt: "desc" },
+      });
+
+      const isAdmin = role === "ADMIN" || role === "SUPERADMIN";
+      const processedBids = bids.map((bid: any) => {
+        if (
+          bid.rfp.workflow === "TWO_ENVELOPE" &&
+          bid.technicalStatus !== "QUALIFIED" &&
+          bid.supplierId !== userId &&
+          !isAdmin
+        ) {
+          return { ...bid, amount: null };
+        }
+        return bid;
       });
 
       await logActivity(
@@ -115,8 +135,8 @@ export const bidController = {
       return res.status(200).json({
         success: true,
         message: role === "ADMIN" ? "All system bids" : "Your relevant bids",
-        count: bids.length,
-        data: bids,
+        count: processedBids.length,
+        data: processedBids,
       });
     } catch (error) {
       console.log("[BID_CONTROLLER_GET_BIDS]");
@@ -272,6 +292,16 @@ export const bidController = {
         "bids.getOne",
       );
 
+      // Mask financial amount if Two-Envelope and not yet qualified
+      if (
+        bid.rfp.workflow === "TWO_ENVELOPE" &&
+        bid.technicalStatus !== "QUALIFIED" &&
+        !isOwner &&
+        !isAdmin
+      ) {
+        (bid as any).amount = null;
+      }
+
       return res.status(200).json({
         success: true,
         data: bid,
@@ -329,7 +359,7 @@ export const bidController = {
 
   applyToBid: async (req: AuthenticatedRequest, res: Response) => {
     const { rfpId } = req.params as { rfpId: string };
-    const { proposal } = req.body;
+    const { proposal, amount } = req.body;
     const supplierId = req.user?.id as string;
     const io = getIO();
     const file = req.file;
@@ -347,7 +377,9 @@ export const bidController = {
             rfpId,
             supplierId,
             proposal,
+            amount: amount ? parseFloat(amount) : null,
             status: "PENDING_APPROVAL",
+            technicalStatus: "PENDING",
           },
           include: {
             rfp: { select: { buyerId: true, title: true } },
@@ -445,10 +477,15 @@ export const bidController = {
       const { status, rejectionReason } = req.body;
       const io = getIO();
 
+      const isEligible = status === "ACTIVE";
+
       const bid = await prisma.bid.update({
         where: { id: bidId },
-        data: { status, rejectionReason },
-        include: { rfp: { select: { title: true } } },
+        data: { status, rejectionReason, isEligibleForBidRoom: isEligible },
+        include: {
+          rfp: { select: { title: true } },
+          supplier: { select: { businessName: true } },
+        },
       });
 
       // --- NOTIFICATION & SOCKET LOGIC ---
@@ -465,6 +502,8 @@ export const bidController = {
 
       // Tell the supplier UI to unlock the financial input
       io.to(bid.supplierId).emit("bid_status_updated", { bidId, status });
+      // Tell everyone viewing the RFP page about the status update
+      io.to(bid.rfpId).emit("bid_status_updated", { bidId, status });
 
       return res.status(200).json({ success: true, data: bid });
     } catch (error) {
@@ -526,6 +565,57 @@ export const bidController = {
     } catch (err) {
       console.error("BID_CONTROLLER_WITHDRAW_BID", err);
       handleError("PATCH /bids/:bidId/withdraw", err, res);
+    }
+  },
+  evaluateTechnicalBid: async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { bidId } = req.params as { bidId: string };
+      const { status, score, rejectionReason } = req.body;
+      const userId = req.user?.id as string;
+      const io = getIO();
+
+      const bid = await prisma.bid.findUnique({
+        where: { id: bidId },
+        include: { rfp: true, supplier: { select: { businessName: true } } },
+      });
+
+      if (!bid) return res.status(404).json({ message: "Bid not found" });
+      if (bid.rfp.buyerId !== userId)
+        return res.status(403).json({ message: "Unauthorized" });
+
+      const updatedBid = await prisma.bid.update({
+        where: { id: bidId },
+        data: {
+          technicalStatus: status,
+          technicalScore: score,
+          rejectionReason: status === "DISQUALIFIED" ? rejectionReason : null,
+          status: status === "QUALIFIED" ? "ACTIVE" : "REJECTED",
+        },
+      });
+
+      await sendNotification({
+        userId: bid.supplierId,
+        type:
+          status === "QUALIFIED"
+            ? "BID_TECHNICAL_PASSED"
+            : "BID_TECHNICAL_REJECTED",
+        content:
+          status === "QUALIFIED"
+            ? `Your technical proposal for "${bid.rfp.title}" has been approved with a score of ${score}.`
+            : `Your technical proposal for "${bid.rfp.title}" was rejected.`,
+        room: bid.supplierId,
+      });
+
+      io.to(bid.rfpId).emit("bid_technical_updated", {
+        bidId,
+        status,
+        score,
+        supplierName: bid.supplier.businessName,
+      });
+
+      return res.status(200).json({ success: true, data: updatedBid });
+    } catch (error) {
+      handleError("PATCH /bids/:bidId/technical", error, res);
     }
   },
 };

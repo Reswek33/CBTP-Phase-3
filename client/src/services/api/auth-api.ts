@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   meSchema,
   type Login,
@@ -66,5 +67,10 @@ export const updateCredentials = async (data: {
   newPassword: string;
 }) => {
   const response = await api.patch("/auth/update", data);
+  return response.data;
+};
+
+export const updateProfile = async (data: any) => {
+  const response = await api.patch("/users", data);
   return response.data;
 };

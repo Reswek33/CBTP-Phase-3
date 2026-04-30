@@ -76,11 +76,11 @@ export const statController = {
         });
         const activeSuppliers = uniqueSuppliers.length;
 
-        const avgBidAmountResult = await prisma.bid.aggregate({
-          where: { rfp: { buyerId: id } },
-          _avg: { amount: true },
+        const totalBudgetResult = await prisma.rfp.aggregate({
+          where: { buyerId: id, status: "OPEN" },
+          _sum: { budget: true },
         });
-        const avgBidAmount = avgBidAmountResult._avg.amount || 0;
+        const totalBudget = totalBudgetResult._sum.budget || 0;
 
         const recentRfps = await prisma.rfp.findMany({
           where: { buyerId: id },
@@ -173,7 +173,7 @@ export const statController = {
             openRfpsCount,
             totalBidsReceived,
             activeSuppliers,
-            avgBidAmount: Math.round(Number(avgBidAmount) / 1000),
+            totalBudget: Number(totalBudget),
             recentRfps: formattedRecentRfps,
             recentBids: formattedRecentBids,
             upcomingDeadlines: formattedDeadlines,

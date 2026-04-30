@@ -47,7 +47,11 @@ export const buyerController = {
           room: userId,
         });
 
-        io.to(userId!).emit("profile_refreshed", { updatedFields: changes });
+        io.to(userId!).emit("profile_sync", {
+          status: "UPDATED",
+          updatedFields: changes,
+          timestamp: new Date().toISOString(),
+        });
       }
 
       // Log successful profile update with changes

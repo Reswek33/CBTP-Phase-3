@@ -49,6 +49,17 @@ export const updateApplicationStatus = async (
   return response.data;
 };
 
+/**
+ * Evaluate technical proposal (Only for Buyers in Two-Envelope workflow).
+ */
+export const evaluateTechnicalBid = async (
+  id: string,
+  data: { status: "QUALIFIED" | "DISQUALIFIED"; score: number; rejectionReason?: string },
+) => {
+  const response = await api.patch(`/bids/${id}/technical`, data);
+  return response.data;
+};
+
 export const applyToBid = async (id: string, data: FormData) => {
   const isFormData = data instanceof FormData;
 

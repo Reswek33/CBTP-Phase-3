@@ -11,6 +11,7 @@ const isProduction = process.env.NODE_ENV === "production";
 interface TokenPayload {
   id: string;
   role: string;
+  adminRole?: string;
 }
 
 /**
@@ -19,7 +20,7 @@ interface TokenPayload {
  * @param role The currenttly Logged in user role
  * @returns accessToken and refreshToken
  */
-const generateTokens = (id: string, role: string) => {
+const generateTokens = (id: string, role: string, adminRole?: string | null) => {
   // Fix: Provide explicit type for options and ensure expiresIn is properly typed
   const accessTokenOptions: jwt.SignOptions = {
     expiresIn: ACCESS_EXPIRES_IN as number | jwt.SignOptions["expiresIn"],
@@ -30,13 +31,13 @@ const generateTokens = (id: string, role: string) => {
   };
 
   const accessToken = jwt.sign(
-    { id, role },
+    { id, role, adminRole },
     ACCESS_TOKEN_SECRET,
     accessTokenOptions,
   );
 
   const refreshToken = jwt.sign(
-    { id, role },
+    { id, role, adminRole },
     REFRESH_TOKEN_SECRET,
     refreshTokenOptions,
   );

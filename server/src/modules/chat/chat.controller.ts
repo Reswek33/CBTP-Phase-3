@@ -93,7 +93,10 @@ export const chatController = {
       // 3. REAL-TIME EMIT
       try {
         const io = getIO();
-        io.to(conversationId).emit("new_message", message);
+        io.to(conversationId)
+          .to(conversation.buyerId)
+          .to(conversation.supplierId)
+          .emit("new_message", message);
       } catch (socketErr) {
         console.warn("[SOCKET_EMIT_FAILED]", socketErr);
         // We don't fail the request because the DB write succeeded
@@ -242,7 +245,6 @@ export const chatController = {
   markMessageAsRead: async (req: AuthenticatedRequest, res: Response) => {
     const { conversationId } = req.params as { conversationId: string };
     const userId = req.user?.id;
-    const io = getIO();
 
     try {
       await prisma.message.updateMany({
@@ -268,11 +270,16 @@ export const chatController = {
 
       const unreadCount = updatedConversation?.messages.length || 0;
       const io = getIO();
-      io.to(conversationId).emit("messages_read", {
-        conversationId,
-        userId,
-        unreadCount,
-      });
+      if (updatedConversation) {
+        io.to(conversationId)
+          .to(updatedConversation.buyerId)
+          .to(updatedConversation.supplierId)
+          .emit("messages_read", {
+            conversationId,
+            userId,
+            unreadCount,
+          });
+      }
 
       res.json({
         success: true,
@@ -288,7 +295,13 @@ export const chatController = {
     try {
       const userId = req.user?.id!;
       const unreadMessages = await prisma.message.findMany({
-        where: { id: userId, isRead: false },
+        where: {
+          isRead: false,
+          senderId: { not: userId },
+          conversation: {
+            OR: [{ buyerId: userId }, { supplierId: userId }],
+          },
+        },
       });
 
       return res.status(200).json({

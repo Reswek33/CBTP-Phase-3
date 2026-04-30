@@ -4,6 +4,23 @@ import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { getDashboardStatus } from "@/services/api/status-api";
 import {
+  getAdminDashboardStats,
+  getAnalyticsOverview,
+} from "@/services/api/admin-api";
+import { motion } from "framer-motion";
+import { DashboardSkeleton } from "./ui/SkeletonLoader";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from "recharts";
+import {
   TrendingUp,
   Users,
   FileText,
@@ -27,11 +44,16 @@ import {
 // Type definitions for API responses
 interface AdminDashboardData {
   totalUsers: number;
+  totalSuppliers?: number;
+  totalBuyers?: number;
   pendingVerifications: number;
   activeRfps: number;
   totalBids: number;
+  activeSubscriptions?: number;
+  totalRevenue?: number;
   recentActivities: ActivityItem[];
   topPerformers: PerformerItem[];
+  recentTransactions?: any[];
 }
 
 interface SupplierDashboardData {
@@ -48,7 +70,7 @@ interface BuyerDashboardData {
   openRfpsCount: number;
   totalBidsReceived: number;
   activeSuppliers: number;
-  avgBidAmount: number;
+  totalBudget: number;
   recentRfps: RFPItem[];
   recentBids: BidItem[];
   upcomingDeadlines: DeadlineItem[];
@@ -95,6 +117,7 @@ interface DeadlineItem {
 export const DashboardHome = () => {
   const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -104,10 +127,34 @@ export const DashboardHome = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
+
+        // Fetch base stats
         const response = await getDashboardStatus();
+        let combinedData = response.data;
+
+        // If admin, fetch additional monitoring stats
+        if (role === "ADMIN" || role === "SUPERADMIN") {
+          try {
+            const [adminStats, analytics] = await Promise.all([
+              getAdminDashboardStats(),
+              getAnalyticsOverview(),
+            ]);
+
+            if (adminStats.success) {
+              combinedData = {
+                ...combinedData,
+                ...adminStats.data.metrics,
+                recentTransactions: adminStats.data.recentTransactions,
+              };
+            }
+            setAnalyticsData(analytics.data);
+          } catch (adminErr) {
+            console.error("ADMIN_STATS_FETCH_FAILED", adminErr);
+          }
+        }
 
         if (response && response.success) {
-          setDashboardData(response.data);
+          setDashboardData(combinedData);
         } else {
           setError(true);
         }
@@ -122,15 +169,12 @@ export const DashboardHome = () => {
     if (user) {
       fetchStats();
     }
-  }, [user]);
+  }, [user, role]);
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-sm font-mono text-muted-foreground">
-          LOADING_DASHBOARD_DATA...
-        </p>
+      <div className="animate-in fade-in duration-500">
+        <DashboardSkeleton />
       </div>
     );
   }
@@ -179,23 +223,36 @@ export const DashboardHome = () => {
     const data = dashboardData as AdminDashboardData;
 
     return (
-      <div className="space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6"
+      >
         {/* Welcome Header */}
-        <div className="bg-card border border-border rounded-2xl p-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground mb-2">
-                Admin Dashboard
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                System overview and management
+        <div className="bg-card border border-border rounded-3xl p-8 relative overflow-hidden group shadow-xl shadow-primary/5">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full group-hover:bg-primary/10 transition-all duration-700" />
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="space-y-2">
+              <motion.h1
+                initial={{ x: -20 }}
+                animate={{ x: 0 }}
+                className="text-3xl font-black text-foreground tracking-tight"
+              >
+                Control <span className="text-primary">Center</span>
+              </motion.h1>
+              <p className="text-muted-foreground font-medium">
+                System health is{" "}
+                <span className="text-emerald-500 font-bold">Optimal</span>. All
+                services are operational.
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
-                <Activity className="w-4 h-4 text-green-500" />
-                <span className="text-xs font-mono text-muted-foreground">
-                  System: Operational
+
+            <div className="flex items-center gap-4">
+              <div className="px-6 py-3 bg-background/50 backdrop-blur-md border border-border rounded-2xl flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Live Monitoring
                 </span>
               </div>
             </div>
@@ -203,13 +260,27 @@ export const DashboardHome = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <StatCard
             title="Total Users"
             value={data.totalUsers || 0}
             icon={<Users className="w-5 h-5" />}
             color="blue"
             link="/dashboard/admin/users"
+          />
+          <StatCard
+            title="Active Subscriptions"
+            value={data.activeSubscriptions || 0}
+            icon={<Zap className="w-5 h-5" />}
+            color="purple"
+            link="/dashboard/admin/subscriptions"
+          />
+          <StatCard
+            title="Total Revenue"
+            value={`${(data.totalRevenue || 0).toLocaleString()} ETB`}
+            icon={<DollarSign className="w-5 h-5" />}
+            color="emerald"
+            link="/dashboard/admin/transactions"
           />
           <StatCard
             title="Pending Verifications"
@@ -229,10 +300,126 @@ export const DashboardHome = () => {
             title="Total Bids"
             value={data.totalBids || 0}
             icon={<Award className="w-5 h-5" />}
-            color="purple"
+            color="blue"
             link="/dashboard/rfps"
           />
         </div>
+
+        {/* Analytics Section */}
+        {analyticsData && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-card border border-border rounded-2xl p-6">
+              <h3 className="text-sm font-bold mb-6 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" /> User Growth
+                (Last 6 Months)
+              </h3>
+              <div className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={analyticsData.userGrowth}>
+                    <defs>
+                      <linearGradient
+                        id="dashColor"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#3B82F6"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#3B82F6"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#334155"
+                      opacity={0.1}
+                    />
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#1e293b",
+                        border: "none",
+                        borderRadius: "8px",
+                        fontSize: "10px",
+                      }}
+                      itemStyle={{ color: "#fff" }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#3B82F6"
+                      fillOpacity={1}
+                      fill="url(#dashColor)"
+                      strokeWidth={3}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-2xl p-6">
+              <h3 className="text-sm font-bold mb-6 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-500" /> Revenue Growth
+              </h3>
+              <div className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analyticsData.subscriptionTrends}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#334155"
+                      opacity={0.1}
+                    />
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#1e293b",
+                        border: "none",
+                        borderRadius: "8px",
+                        fontSize: "10px",
+                      }}
+                      itemStyle={{ color: "#fff" }}
+                    />
+                    <Bar
+                      dataKey="revenue"
+                      fill="#F59E0B"
+                      radius={[4, 4, 0, 0]}
+                      barSize={30}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Charts and Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -248,13 +435,36 @@ export const DashboardHome = () => {
 
           {/* Top Performers */}
           <TopPerformersCard performers={data.topPerformers || []} />
+
+          {/* Recent Transactions */}
+          {data.recentTransactions && (
+            <div className="lg:col-span-2">
+              <RecentTransactionsCard transactions={data.recentTransactions} />
+            </div>
+          )}
         </div>
 
         {/* Quick Actions */}
         <QuickActionsCard role="admin" />
-      </div>
+      </motion.div>
     );
   }
+
+  // Helper for Onboarding Progress
+  const getOnboardingProgress = () => {
+    if (role === "SUPPLIER") {
+      let score = 0;
+      if (user?.supplier?.status === "VERIFIED") score += 50;
+      if (dashboardData.activeBids > 0) score += 50;
+      return score;
+    }
+    if (role === "BUYER") {
+      let score = 0;
+      if (dashboardData.openRfpsCount > 0) score += 100;
+      return score;
+    }
+    return 0;
+  };
 
   // 2. SUPPLIER VIEW
   if (role === "SUPPLIER") {
@@ -262,53 +472,103 @@ export const DashboardHome = () => {
     const isPending = user?.supplier?.status === "PENDING";
 
     return (
-      <div className="space-y-6">
-        {/* Welcome Header with Verification Status */}
-        <div className="bg-card border border-border rounded-2xl p-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground mb-2">
-                Welcome back, {user?.firstName}! 👋
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                Track your bids and discover new opportunities
-              </p>
-            </div>
-            {isPending ? (
-              <div className="flex items-center gap-2 px-3 py-2 bg-destructive/20 rounded-lg border border-destructive/30">
-                <AlertCircle className="w-4 h-4 text-destructive" />
-                <span className="text-xs font-mono text-destructive">
-                  PENDING VERIFICATION
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-500/20 rounded-lg border border-green-500/30">
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                <span className="text-xs font-mono text-green-500">
-                  VERIFIED ACCOUNT
-                </span>
-              </div>
-            )}
-          </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6"
+      >
+        {/* Welcome Header with Onboarding */}
+        <div className="bg-card border border-border rounded-3xl p-8 relative overflow-hidden group shadow-xl shadow-primary/5">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full group-hover:bg-primary/10 transition-all duration-700" />
 
-          {isPending && (
-            <div className="mt-4 p-4 bg-destructive/10 rounded-xl border border-destructive/30">
-              <p className="text-sm text-destructive mb-2">
-                ⚠️ Your account is pending verification. You can browse RFPs but
-                cannot place bids yet.
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="space-y-2">
+              <div className="flex items-center gap-4 mb-2">
+                <motion.h1
+                  initial={{ x: -20 }}
+                  animate={{ x: 0 }}
+                  className="text-3xl font-black text-foreground tracking-tight"
+                >
+                  Welcome back,{" "}
+                  <span className="text-primary">{user?.firstName}!</span> 👋
+                </motion.h1>
+                {isPending ? (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-destructive/20 rounded-lg border border-destructive/30">
+                    <AlertCircle className="w-4 h-4 text-destructive" />
+                    <span className="text-[10px] font-bold text-destructive uppercase">
+                      PENDING
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 rounded-lg border border-green-500/30">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <span className="text-[10px] font-bold text-green-500 uppercase">
+                      VERIFIED
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="text-muted-foreground font-medium">
+                You have{" "}
+                <span className="text-foreground font-bold">
+                  {data.activeBids} active bids
+                </span>{" "}
+                requiring attention today.
               </p>
-              <Link
-                to="/dashboard/onboarding"
-                className="text-sm text-destructive hover:text-destructive/80 font-medium"
-              >
-                Complete Verification →
-              </Link>
             </div>
-          )}
+
+            <div className="bg-background/50 backdrop-blur-md border border-border p-5 rounded-2xl w-full md:w-72 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Setup Progress
+                </span>
+                <span className="text-xs font-bold text-primary">
+                  {getOnboardingProgress()}%
+                </span>
+              </div>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${getOnboardingProgress()}%` }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                  className="h-full bg-primary"
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-3 font-medium">
+                {getOnboardingProgress() < 100
+                  ? "Complete your profile to unlock full features."
+                  : "You're all set! Ready for more bids?"}
+              </p>
+            </div>
+          </div>
         </div>
 
+        {isPending && (
+          <div className="p-6 bg-destructive/10 rounded-3xl border border-destructive/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-destructive/20 flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-destructive" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground">
+                  Action Required: Verification Pending
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Complete your onboarding to start bidding on RFPs.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/dashboard/onboarding"
+              className="px-6 py-3 bg-destructive text-white rounded-xl font-bold hover:bg-destructive/90 transition-colors text-center"
+            >
+              Complete Onboarding →
+            </Link>
+          </div>
+        )}
+
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             title="Active Bids"
             value={data.activeBids || 0}
@@ -340,8 +600,7 @@ export const DashboardHome = () => {
         </div>
 
         {/* Charts and Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent RFPs */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <RecentRfpsCard
             rfps={
               data.recentRfps?.map((rfp) => ({
@@ -350,8 +609,6 @@ export const DashboardHome = () => {
               })) || []
             }
           />
-
-          {/* Upcoming Deadlines */}
           <UpcomingDeadlinesCard
             deadlines={
               data.upcomingDeadlines?.map((deadline) => ({
@@ -362,7 +619,6 @@ export const DashboardHome = () => {
           />
         </div>
 
-        {/* Recommended Opportunities */}
         <RecommendedOpportunitiesCard
           opportunities={
             data.recommendedRfps?.map((opp) => ({
@@ -372,9 +628,8 @@ export const DashboardHome = () => {
           }
         />
 
-        {/* Quick Actions */}
         <QuickActionsCard role="supplier" />
-      </div>
+      </motion.div>
     );
   }
 
@@ -383,21 +638,61 @@ export const DashboardHome = () => {
     const data = dashboardData as BuyerDashboardData;
 
     return (
-      <div className="space-y-6">
-        {/* Welcome Header */}
-        <div className="bg-card border border-border rounded-2xl p-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">
-              {user?.buyer?.companyName || "Buyer Console"}
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              Manage procurement and evaluate suppliers
-            </p>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6"
+      >
+        {/* Welcome Header with Onboarding */}
+        <div className="bg-card border border-border rounded-3xl p-8 relative overflow-hidden group shadow-xl shadow-primary/5">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full group-hover:bg-primary/10 transition-all duration-700" />
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="space-y-2">
+              <motion.h1
+                initial={{ x: -20 }}
+                animate={{ x: 0 }}
+                className="text-3xl font-black text-foreground tracking-tight"
+              >
+                {user?.buyer?.companyName || "Buyer Console"}
+              </motion.h1>
+              <p className="text-muted-foreground font-medium">
+                You have{" "}
+                <span className="text-foreground font-bold">
+                  {data.openRfpsCount} open RFPs
+                </span>{" "}
+                active in the market.
+              </p>
+            </div>
+
+            <div className="bg-background/50 backdrop-blur-md border border-border p-5 rounded-2xl w-full md:w-72 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Setup Progress
+                </span>
+                <span className="text-xs font-bold text-primary">
+                  {getOnboardingProgress()}%
+                </span>
+              </div>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${getOnboardingProgress()}%` }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                  className="h-full bg-primary"
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-3 font-medium">
+                {getOnboardingProgress() < 100
+                  ? "Start a new RFP to complete your setup."
+                  : "Strategic procurement is in progress!"}
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             title="Open RFPs"
             value={data.openRfpsCount || 0}
@@ -406,9 +701,9 @@ export const DashboardHome = () => {
             link="/dashboard/rfps"
           />
           <StatCard
-            title="Total Bids Received"
+            title="Bids Received"
             value={data.totalBidsReceived || 0}
-            icon={<MessageSquare className="w-5 h-5" />}
+            icon={<Target className="w-5 h-5" />}
             color="purple"
             link="/dashboard/rfps"
           />
@@ -420,41 +715,50 @@ export const DashboardHome = () => {
             link="/dashboard/rfps"
           />
           <StatCard
-            title="Avg. Bid Amount"
-            value={`$${data.avgBidAmount || 0}k`}
+            title="Budget (Active)"
+            value={`${(data.totalBudget || 0).toLocaleString()} ETB`}
             icon={<DollarSign className="w-5 h-5" />}
-            color="amber"
+            color="emerald"
             link="/dashboard/rfps"
           />
         </div>
 
-        {/* Charts and Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent RFPs */}
-          <RecentRfpsCard
-            rfps={
-              data.recentRfps?.map((rfp) => ({
-                ...rfp,
-                deadline: formatDeadlineDate(rfp.deadline),
-              })) || []
-            }
-            isBuyer
-          />
-
-          {/* Bid Activity */}
-          <BidActivityCard
-            bids={
-              data.recentBids?.map((bid) => ({
-                ...bid,
-                time: formatDate(bid.time),
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <RecentRfpsCard
+              rfps={
+                data.recentRfps?.map((rfp) => ({
+                  ...rfp,
+                  deadline: formatDeadlineDate(rfp.deadline),
+                })) || []
+              }
+              isBuyer={true}
+            />
+          </div>
+          <UpcomingDeadlinesCard
+            deadlines={
+              data.upcomingDeadlines?.map((deadline) => ({
+                ...deadline,
+                date: formatDeadlineDate(deadline.date),
               })) || []
             }
           />
         </div>
 
-        {/* Quick Actions */}
-        <QuickActionsCard role="buyer" />
-      </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <BidActivityCard
+              bids={
+                data.recentBids?.map((bid) => ({
+                  ...bid,
+                  time: formatDate(bid.time),
+                })) || []
+              }
+            />
+          </div>
+          <QuickActionsCard role="buyer" />
+        </div>
+      </motion.div>
     );
   }
 
@@ -466,8 +770,7 @@ export const DashboardHome = () => {
   );
 };
 
-// --- Sub-Components ---
-
+// --- Sub-Components --- (Rest of the components remain the same)
 interface StatCardProps {
   title: string;
   value: string | number;
@@ -492,64 +795,86 @@ const StatCard: React.FC<StatCardProps> = ({
   }[color];
 
   return (
-    <Link
-      to={link}
-      className={`bg-card border border-border rounded-xl p-5 bg-linear-to-br ${colorClasses} hover:scale-[1.02] transition-all duration-200 block`}
+    <motion.div
+      whileHover={{ y: -5 }}
+      transition={{ type: "spring", stiffness: 300 }}
     >
-      <div className="flex items-center justify-between mb-3">
-        <div
-          className={`w-10 h-10 rounded-lg bg-${color}-500/20 flex items-center justify-center text-${color}-500`}
-        >
+      <Link
+        to={link}
+        className={`bg-card border border-border rounded-2xl p-6 bg-linear-to-br ${colorClasses} hover:shadow-xl transition-all duration-300 block relative overflow-hidden group`}
+      >
+        <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-125 transition-transform">
           {icon}
         </div>
-      </div>
-      <p className="text-3xl font-bold text-foreground mb-1">{value}</p>
-      <p className="text-xs font-mono text-muted-foreground">{title}</p>
-    </Link>
+        <div className="flex items-center justify-between mb-4">
+          <div
+            className={`w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary`}
+          >
+            {icon}
+          </div>
+        </div>
+        <p className="text-4xl font-black text-foreground mb-1 tracking-tight">
+          {value}
+        </p>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          {title}
+        </p>
+      </Link>
+    </motion.div>
   );
 };
 
 const RecentActivityCard: React.FC<{ activities: ActivityItem[] }> = ({
   activities,
 }) => (
-  <div className="bg-card border border-border rounded-2xl p-6">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-        <Activity className="w-5 h-5 text-primary" />
-        Recent Activity
+  <div className="bg-card border border-border rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-500">
+    <div className="flex items-center justify-between mb-8">
+      <h3 className="text-xl font-bold text-foreground flex items-center gap-3">
+        <Activity className="w-6 h-6 text-primary" />
+        Live Pulse
       </h3>
       <Link
         to="/dashboard/admin/logs"
-        className="text-xs text-primary hover:text-primary/80"
+        className="px-4 py-2 bg-primary/5 text-primary rounded-xl text-xs font-bold hover:bg-primary hover:text-white transition-all"
       >
-        View All →
+        View Logs
       </Link>
     </div>
-    <div className="space-y-3">
+    <div className="space-y-4">
       {activities.length === 0 ? (
-        <p className="text-center text-muted-foreground py-8">
-          No recent activities
-        </p>
+        <div className="text-center py-12">
+          <Activity className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
+          <p className="text-muted-foreground text-sm font-medium">
+            Monitoring system pulses...
+          </p>
+        </div>
       ) : (
-        activities.map((activity) => (
-          <div
+        activities.map((activity, idx) => (
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: idx * 0.1 }}
             key={activity.id}
-            className="flex items-center gap-3 p-3 rounded-lg bg-muted/30"
+            className="flex items-center gap-4 p-4 rounded-2xl bg-muted/20 border border-transparent hover:border-border hover:bg-muted/30 transition-all group"
           >
             <div
-              className={`w-2 h-2 rounded-full ${
+              className={`w-3 h-3 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.1)] ${
                 activity.status === "success"
-                  ? "bg-green-500"
+                  ? "bg-emerald-500 shadow-emerald-500/20"
                   : activity.status === "warning"
-                    ? "bg-destructive"
-                    : "bg-primary"
+                    ? "bg-amber-500 shadow-amber-500/20"
+                    : "bg-primary shadow-primary/20"
               }`}
             />
             <div className="flex-1">
-              <p className="text-sm text-foreground">{activity.action}</p>
-              <p className="text-xs text-muted-foreground">{activity.time}</p>
+              <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
+                {activity.action}
+              </p>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-tighter opacity-70">
+                {activity.time}
+              </p>
             </div>
-          </div>
+          </motion.div>
         ))
       )}
     </div>
@@ -559,50 +884,53 @@ const RecentActivityCard: React.FC<{ activities: ActivityItem[] }> = ({
 const TopPerformersCard: React.FC<{ performers: PerformerItem[] }> = ({
   performers,
 }) => (
-  <div className="bg-card border border-border rounded-2xl p-6">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-        <Award className="w-5 h-5 text-primary" />
-        Top Performers
+  <div className="bg-card border border-border rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-500">
+    <div className="flex items-center justify-between mb-8">
+      <h3 className="text-xl font-bold text-foreground flex items-center gap-3">
+        <Award className="w-6 h-6 text-amber-500" />
+        Elite Partners
       </h3>
-      <Link
-        to="/dashboard/admin/users"
-        className="text-xs text-primary hover:text-primary/80"
-      >
-        View All →
-      </Link>
     </div>
-    <div className="space-y-3">
+    <div className="space-y-4">
       {performers.length === 0 ? (
-        <p className="text-center text-muted-foreground py-8">
-          No performers data
-        </p>
+        <div className="text-center py-12">
+          <Award className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
+          <p className="text-muted-foreground text-sm font-medium">
+            No performance data yet
+          </p>
+        </div>
       ) : (
         performers.map((performer, idx) => (
-          <div
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: idx * 0.1 }}
             key={performer.id}
-            className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
+            className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-transparent hover:border-border transition-all"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                #{idx + 1}
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-sm font-black text-primary">
+                0{idx + 1}
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-sm font-black text-foreground">
                   {performer.name}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {performer.bids} bids placed
+                <p className="text-xs text-muted-foreground font-bold">
+                  {performer.bids} SUCCESSFUL BIDS
                 </p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm font-bold text-green-500">
+              <div className="flex items-center gap-1 text-emerald-500 font-black text-lg">
+                <TrendingUp className="w-4 h-4" />
                 {performer.winRate}%
+              </div>
+              <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">
+                Win Velocity
               </p>
-              <p className="text-xs text-muted-foreground">win rate</p>
             </div>
-          </div>
+          </motion.div>
         ))
       )}
     </div>
@@ -732,7 +1060,7 @@ const BidActivityCard: React.FC<{ bids: BidItem[] }> = ({ bids }) => (
                 {bid.supplierName}
               </p>
               <p className="text-xs text-muted-foreground">
-                Bid amount: ${bid.amount?.toLocaleString()}
+                Bid amount: {(bid.amount || 0).toLocaleString()} ETB
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -901,3 +1229,78 @@ const QuickActionsCard: React.FC<{ role: string }> = ({ role }) => {
     </div>
   );
 };
+
+const RecentTransactionsCard: React.FC<{ transactions: any[] }> = ({
+  transactions,
+}) => (
+  <div className="bg-card border border-border rounded-2xl p-6">
+    <div className="flex items-center justify-between mb-4">
+      <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+        <DollarSign className="w-5 h-5 text-emerald-500" />
+        Recent Transactions
+      </h3>
+      <Link
+        to="/dashboard/admin/transactions"
+        className="text-xs text-primary hover:text-primary/80"
+      >
+        Audit All →
+      </Link>
+    </div>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-muted-foreground border-b border-border">
+            <th className="pb-2 font-medium">User</th>
+            <th className="pb-2 font-medium text-right">Amount</th>
+            <th className="pb-2 font-medium text-center">Status</th>
+            <th className="pb-2 font-medium text-right">Date</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {transactions.length === 0 ? (
+            <tr>
+              <td
+                colSpan={4}
+                className="py-8 text-center text-muted-foreground"
+              >
+                No recent transactions
+              </td>
+            </tr>
+          ) : (
+            transactions.map((tx) => (
+              <tr key={tx.id} className="hover:bg-muted/30 transition-colors">
+                <td className="py-3 text-left">
+                  <div className="flex flex-col">
+                    <span className="font-medium text-foreground">
+                      {tx.user?.firstName} {tx.user?.lastName}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground uppercase">
+                      {tx.plan?.name}
+                    </span>
+                  </div>
+                </td>
+                <td className="py-3 text-right font-mono font-bold text-emerald-500">
+                  {parseFloat(tx.amount).toLocaleString()} {tx.currency}
+                </td>
+                <td className="py-3 text-center">
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                      tx.status === "SUCCESS"
+                        ? "bg-green-500/20 text-green-500"
+                        : "bg-amber-500/20 text-amber-500"
+                    }`}
+                  >
+                    {tx.status}
+                  </span>
+                </td>
+                <td className="py-3 text-right text-xs text-muted-foreground">
+                  {new Date(tx.createdAt).toLocaleDateString()}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
