@@ -9,6 +9,8 @@ import { prisma } from "../../config/prisma.js";
  * @param context - Where the log originated (e.g., "AuthService.register")
  * @param payload - Extra JSON data (sanitized automatically)
  * @param isUserAction - If true, records to ActivityLog (visible to users/admins)
+ * @param ipAddress - Client IP address
+ * @param userAgent - Client User Agent
  */
 
 export const logActivity = async (
@@ -18,6 +20,8 @@ export const logActivity = async (
   context?: string,
   payload?: Record<string, any>,
   isUserAction: boolean = false,
+  ipAddress?: string,
+  userAgent?: string,
 ) => {
   try {
     // Sanitize payload to remove sensitive keys
@@ -38,6 +42,8 @@ export const logActivity = async (
           userId,
           context,
           payload: sanitizedPayload as any,
+          ipAddress,
+          userAgent
         },
       });
       if (userId && isUserAction) {
@@ -45,6 +51,8 @@ export const logActivity = async (
           data: {
             userId: userId,
             action: message,
+            ipAddress,
+            userAgent
           },
         });
       }
